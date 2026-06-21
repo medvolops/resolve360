@@ -10,7 +10,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --sb:#0f172a;--sb2:#1e293b;--sbt:#94a3b8;--sbh:#f1f5f9;--sba:rgba(99,102,241,.18);--sbac:#a5b4fc;
+  --sb:#fef9e7;--sb2:#fdf3d0;--sbt:#64748b;--sbh:#1e293b;--sba:rgba(99,102,241,.18);--sbac:#a5b4fc;
   --p:#6366f1;--pd:#4f46e5;--pl:#eef2ff;
   --g50:#f8fafc;--g100:#f1f5f9;--g200:#e2e8f0;--g300:#cbd5e1;--g400:#94a3b8;--g500:#64748b;--g600:#475569;--g700:#334155;--g800:#1e293b;--g900:#0f172a;
   --red:#ef4444;--redl:#fef2f2;--amber:#f59e0b;--amberl:#fffbeb;
@@ -70,7 +70,8 @@ a{cursor:pointer}
   padding:10px 4px 20px;
 }
 .sidebar:hover,.sidebar.pinned{width:220px;overflow-y:auto;padding:10px 8px 20px}
-.sidebar:not(.pinned):hover{box-shadow:6px 0 28px rgba(0,0,0,.3)}
+.sidebar:not(.pinned):hover{box-shadow:6px 0 20px rgba(0,0,0,.08)}
+.sidebar{border-right:1px solid #f0e6c8}
 /* Main always offset 54px; extra when sidebar pinned */
 .main{position:absolute;left:54px;right:0;top:0;bottom:0;overflow-y:auto;padding:22px;transition:left .22s cubic-bezier(.4,0,.2,1)}
 .layout.sb-open>.main{left:220px}
@@ -83,8 +84,8 @@ a{cursor:pointer}
 .ni-txt,.s-raise-txt,.s-hdr-lbl,.s-hdr-arrow,.nb{transition:opacity .18s}
 /* Pin toggle */
 .sb-toggle{display:flex;justify-content:flex-end;padding:2px 2px 8px;flex-shrink:0}
-.sb-toggle-btn{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:rgba(255,255,255,.07);color:var(--sbt);font-size:12px;cursor:pointer;transition:background .12s;white-space:nowrap}
-.sb-toggle-btn:hover{background:rgba(255,255,255,.16);color:var(--sbh)}
+.sb-toggle-btn{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:rgba(0,0,0,.05);color:var(--sbt);font-size:12px;cursor:pointer;transition:background .12s;white-space:nowrap}
+.sb-toggle-btn:hover{background:rgba(0,0,0,.1);color:var(--sbh)}
 
 .s-section{}
 .s-hdr{display:flex;align-items:center;justify-content:space-between;padding:7px 10px 4px;cursor:pointer;user-select:none;white-space:nowrap}
@@ -93,7 +94,7 @@ a{cursor:pointer}
 .s-hdr-arrow.open{transform:rotate(90deg)}
 .s-items{overflow:hidden;transition:max-height .22s ease}
 .ni{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sbt);margin-bottom:1px;cursor:pointer;transition:all .12s;white-space:nowrap;overflow:hidden}
-.ni:hover{background:rgba(255,255,255,.07);color:var(--sbh)}
+.ni:hover{background:rgba(0,0,0,.05);color:var(--sbh)}
 .ni.active{background:var(--sba);color:var(--sbac);font-weight:600}
 .ni .ico{font-size:15px;width:20px;text-align:center;flex-shrink:0}
 .ni .nb{margin-left:auto;background:rgba(239,68,68,.85);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:999px;min-width:16px;text-align:center;flex-shrink:0}
@@ -320,12 +321,12 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 <script>
 // ── THEMES ──
 const THEMES={
-  lavender:{sb:'#2e2845',p:'#9b8ec4',pd:'#7c6ea8',pl:'#f5f0ff',sba:'rgba(155,142,196,.18)',sbac:'#d4c8f0',label:'Lavender'},
-  sage:    {sb:'#233027',p:'#7aaa8e',pd:'#5e9173',pl:'#f0f7f3',sba:'rgba(122,170,142,.18)',sbac:'#b8ddc8',label:'Sage'},
-  blush:   {sb:'#2e1f28',p:'#c47d97',pd:'#a8607c',pl:'#fdf0f5',sba:'rgba(196,125,151,.18)',sbac:'#e8b5c8',label:'Blush'},
-  sand:    {sb:'#2c2419',p:'#b8976a',pd:'#9c7a50',pl:'#fdf8f0',sba:'rgba(184,151,106,.18)',sbac:'#dfc9a0',label:'Sand'},
-  dusk:    {sb:'#1d2535',p:'#7aaac8',pd:'#5a8fad',pl:'#f0f6fb',sba:'rgba(122,170,200,.18)',sbac:'#b0d4e8',label:'Dusk'},
-  pebble:  {sb:'#252525',p:'#8c8c8c',pd:'#6a6a6a',pl:'#f5f5f5',sba:'rgba(140,140,140,.15)',sbac:'#c8c8c8',label:'Pebble'},
+  lavender:{sb:'#fef9e7',sbt:'#64748b',sbh:'#1e293b',p:'#9b8ec4',pd:'#7c6ea8',pl:'#f5f0ff',sba:'rgba(155,142,196,.15)',sbac:'#6d5fa8',label:'Lavender'},
+  sage:    {sb:'#fef9e7',sbt:'#64748b',sbh:'#1e293b',p:'#5e9173',pd:'#4a7a5e',pl:'#f0f7f3',sba:'rgba(94,145,115,.15)',sbac:'#3d7558',label:'Sage'},
+  blush:   {sb:'#fef9e7',sbt:'#64748b',sbh:'#1e293b',p:'#c47d97',pd:'#a8607c',pl:'#fdf0f5',sba:'rgba(196,125,151,.15)',sbac:'#a05878',label:'Blush'},
+  sand:    {sb:'#fef9e7',sbt:'#64748b',sbh:'#1e293b',p:'#b8976a',pd:'#9c7a50',pl:'#fdf8f0',sba:'rgba(184,151,106,.15)',sbac:'#8a6a40',label:'Sand'},
+  dusk:    {sb:'#fef9e7',sbt:'#64748b',sbh:'#1e293b',p:'#5a8fad',pd:'#3d7494',pl:'#f0f6fb',sba:'rgba(90,143,173,.15)',sbac:'#3a7090',label:'Dusk'},
+  pebble:  {sb:'#fef9e7',sbt:'#64748b',sbh:'#1e293b',p:'#7a7a7a',pd:'#5a5a5a',pl:'#f5f5f5',sba:'rgba(120,120,120,.12)',sbac:'#4a4a4a',label:'Pebble'},
 };
 let CUR_THEME=localStorage.getItem('et_theme')||'lavender';
 function applyTheme(name,save=true){
