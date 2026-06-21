@@ -370,12 +370,6 @@ const DEF_CATS={
 };
 const DEF_COS=['Metro Pharma Distributors','Sunrise Medical Supplies','Alpha Healthcare Ltd.','City Care Pharma','Bharat Meds & Surgicals','Horizon Drug House','National Medical Stores','Prime Health Distributors','Apex Pharma Wholesale','MedPlus Distributors','Global Pharma Networks','LifeCare Wholesalers'];
 
-function mkSeed(){const n=Date.now();return [
-  {id:'ESC-210625-0001',company:'Metro Pharma Distributors',category:'Invoice & Billing',subcategory:'Invoice Stuck at Approval',priority:'Urgent',desc:'Stockist uploaded invoice 2 days ago. Stuck at approval. Client following up.',raisedBy:'u1',assignedTo:'u4',passedThrough:[],status:'pending',due:new Date(n-3600000).toISOString(),createdAt:new Date(n-7200000).toISOString(),updatedAt:new Date(n-7200000).toISOString(),remarks:'',activity:[{user:'u1',text:'Raised → assigned to Yousuf. Remarks: "Stockist invoice stuck 2 days at approval."',time:new Date(n-7200000).toISOString()}]},
-  {id:'ESC-210625-0002',company:'Sunrise Medical Supplies',category:'Payments',subcategory:'Payment Not Reflected',priority:'High',desc:'Payment received in bank but not in system.',raisedBy:'u2',assignedTo:'u5',passedThrough:['u3'],status:'processing',due:new Date(n+86400000).toISOString(),createdAt:new Date(n-86400000).toISOString(),updatedAt:new Date(n-10800000).toISOString(),remarks:'',activity:[{user:'u2',text:'Raised → assigned to Swathi.',time:new Date(n-86400000).toISOString()},{user:'u3',text:'Reassigned to Vidya. Remarks: "No response after 5h."',time:new Date(n-18000000).toISOString()},{user:'u5',text:'Status → Processing. Remarks: "Checking with accounts."',time:new Date(n-10800000).toISOString()}]},
-  {id:'ESC-210625-0003',company:'City Care Pharma',category:'Delivery & Logistics',subcategory:'Delivery Status Not Updated',priority:'High',desc:'Delivery marked done but portal shows pending.',raisedBy:'u3',assignedTo:'u6',passedThrough:['u4'],status:'onhold',due:new Date(n+172800000).toISOString(),createdAt:new Date(n-43200000).toISOString(),updatedAt:new Date(n-3600000).toISOString(),remarks:'',activity:[{user:'u3',text:'Raised → assigned to Yousuf.',time:new Date(n-43200000).toISOString()},{user:'u4',text:'Escalated → Surya. Remarks: "Logistics unresponsive."',time:new Date(n-7200000).toISOString()},{user:'u6',text:'Status → On Hold. Remarks: "Waiting for logistics team."',time:new Date(n-3600000).toISOString()}]},
-  {id:'ESC-200625-0001',company:'Bharat Meds & Surgicals',category:'Invoice & Billing',subcategory:'GST Correction Required',priority:'Low',desc:'Revised invoice with correct GST requested.',raisedBy:'u2',assignedTo:'u5',passedThrough:[],status:'closed',due:new Date(n-86400000).toISOString(),createdAt:new Date(n-86400000*3).toISOString(),updatedAt:new Date(n-43200000).toISOString(),remarks:'Revised invoice sent and confirmed.',activity:[{user:'u2',text:'Raised → assigned to Vidya.',time:new Date(n-86400000*3).toISOString()},{user:'u5',text:'Closed. Remarks: "Revised invoice sent to client."',time:new Date(n-43200000).toISOString()}]},
-]};
 
 // ── SUPABASE ──
 const SB_URL='https://eryrzyygduqxzzcuwjbz.supabase.co';
@@ -417,7 +411,6 @@ async function seedIfEmpty(){
   if(!C.users.length){await sb.from('users').insert(DEF_USERS);seeded=true}
   if(!C.cos.length){await sb.from('companies').insert(DEF_COS.map(n=>({name:n})))}
   if(!Object.keys(C.cats).length){await sb.from('categories').insert(Object.entries(DEF_CATS).map(([name,subs])=>({name,subcategories:subs})))}
-  if(!C.escs.length){const s=mkSeed();await sb.from('escalations').insert(s)}
   if(seeded)await loadCache(); // reload so cache matches Supabase format exactly
 }
 
