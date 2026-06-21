@@ -1164,8 +1164,7 @@ function handleAvUpload(inp){
 }
 function removeAv(){const avs=DB.avs();delete avs[CU.id];DB.saveAv(avs);renderTopbar();openProfile()}
 function renderThemeSwatches(){
-  const colors={midnight:'#6366f1',ocean:'#0ea5e9',forest:'#10b981',rose:'#f43f5e',amber:'#f59e0b',slate:'#3b82f6'};
-  document.getElementById('theme-swatches').innerHTML=Object.entries(colors).map(([k,c])=>`<div class="th-sw${k===CUR_THEME?' active':''}" data-t="${k}" style="background:${c}" title="${THEMES[k].label}" onclick="applyTheme('${k}')"></div>`).join('');
+  document.getElementById('theme-swatches').innerHTML=Object.entries(THEMES).map(([k,t])=>`<div class="th-sw${k===CUR_THEME?' active':''}" data-t="${k}" style="background:${t.p}" title="${t.label}" onclick="applyTheme('${k}')"></div>`).join('');
   document.getElementById('theme-label').textContent=THEMES[CUR_THEME]?.label||'';
 }
 
