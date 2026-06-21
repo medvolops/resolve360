@@ -574,6 +574,7 @@ function buildSidebar(){
   let h=`<div class="sb-toggle" title="${pinTip}" onclick="toggleSbPin()"><div class="sb-toggle-btn">${pinIco}</div></div>`;
   h+=`<div class="s-raise" onclick="openRaiseModal()"><span style="flex-shrink:0">🚨</span><span class="s-raise-txt">Raise Escalation</span></div>`;
   h+=ni2('dashboard','📊','Dashboard');
+  h+=`<div class="ni ${CP==='todo'?'active':''}" onclick="goTodo()"><span class="ico">📝</span><span class="ni-txt">My To-Do</span></div>`;
   h+=sec('queue','My Queue',[
     ni2r('pending-me','⏳','Pending With Me',pendMe),
     ni2r('processing-me','🔄','I Am Processing',procMe),
@@ -1232,6 +1233,45 @@ function toggleSec(key){
 }
 
 // ── REFRESH ──
+// ── PERSONAL TO-DO ──
+let CT=[]; // cached todos for current user
+async function loadTodos(){const{data}=await sb.from('todos').select('*').eq('userId',CU.id).order('createdAt',{ascending:false});CT=data||[]}
+async function goTodo(){await loadTodos();CP='todo';document.getElementById('main').innerHTML=renderTodo();buildSidebar()}
+function renderTodo(){
+  const todos=CT;
+  const open=todos.filter(t=>!t.done),done=todos.filter(t=>t.done);
+  const row=t=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:7px;background:${t.done?'var(--g50)':'#fff'};border:1px solid var(--g200);margin-bottom:6px">
+    <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" style="width:16px;height:16px;cursor:pointer;accent-color:var(--p)">
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:500;color:${t.done?'var(--g400)':'var(--g800)'};${t.done?'text-decoration:line-through':''}">${t.text}</div>
+      ${t.due?`<div style="font-size:11px;color:${!t.done&&new Date(t.due)<new Date()?'var(--red)':'var(--g400)'};margin-top:2px">📅 ${new Date(t.due).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>`:''}
+    </div>
+    <button onclick="delTodo('${t.id}')" style="background:none;border:none;color:var(--g300);font-size:16px;cursor:pointer;line-height:1" title="Delete">✕</button>
+  </div>`;
+  return `<div class="ph"><div><div class="ptitle">📝 My To-Do</div><div class="psub">Private — only you can see this</div></div></div>
+  <div class="card"><div class="cb">
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <input id="td-txt" class="inp" style="flex:1" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTodo()">
+      <input id="td-due" type="date" class="inp" style="width:140px" title="Due date (optional)">
+      <button class="btn btn-p btn-sm" onclick="addTodo()">+ Add</button>
+    </div>
+  </div></div>
+  ${open.length?`<div class="card"><div class="ch"><span class="ct">Pending (${open.length})</span></div><div class="cb">${open.map(row).join('')}</div></div>`:''}
+  ${done.length?`<div class="card"><div class="ch"><span class="ct" style="color:var(--g400)">Completed (${done.length})</span><button class="btn btn-o btn-sm" onclick="clearDoneTodos()">Clear all</button></div><div class="cb">${done.map(row).join('')}</div></div>`:''}
+  ${!todos.length?`<div class="card"><div class="empty"><div class="ei">📝</div><div class="em">No tasks yet. Add one above!</div></div></div>`:''}`;
+}
+async function addTodo(){
+  const txt=document.getElementById('td-txt')?.value?.trim(),due=document.getElementById('td-due')?.value;
+  if(!txt){showToast('Enter a task','⚠️');return}
+  const t={id:'td'+Date.now(),userId:CU.id,text:txt,done:false,due:due||'',createdAt:new Date().toISOString()};
+  CT.unshift(t);document.getElementById('main').innerHTML=renderTodo();
+  await sb.from('todos').insert(t);
+  document.getElementById('td-txt').value='';document.getElementById('td-due').value='';
+}
+async function toggleTodo(id){const t=CT.find(x=>x.id===id);if(!t)return;t.done=!t.done;document.getElementById('main').innerHTML=renderTodo();await sb.from('todos').update({done:t.done}).eq('id',id)}
+async function delTodo(id){CT=CT.filter(t=>t.id!==id);document.getElementById('main').innerHTML=renderTodo();await sb.from('todos').delete().eq('id',id)}
+async function clearDoneTodos(){CT=CT.filter(t=>!t.done);document.getElementById('main').innerHTML=renderTodo();await sb.from('todos').delete().eq('userId',CU.id).eq('done',true)}
+
 function refreshView(){
   if(!CU)return;
   const views={
@@ -1240,7 +1280,7 @@ function refreshView(){
     'raised-all':()=>renderList('raised-all'),'team-active':()=>renderList('team-active'),'team-raised':()=>renderList('team-raised'),
     'team-pending':()=>renderList('team-pending'),closed:()=>renderList('closed'),
     'team-dashboard':renderTeamDash,'mgr-overview':renderMgrOverview,'mgr-agents':renderMgrAgents,
-    reports:renderReports,admin:renderAdmin,
+    reports:renderReports,admin:renderAdmin,todo:renderTodo,
   };
   const fn=views[CP];
   if(fn){document.getElementById('main').innerHTML=fn();if(CP==='reports')setTimeout(initCharts,50)}
