@@ -320,16 +320,16 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 <script>
 // ── THEMES ──
 const THEMES={
-  midnight:{sb:'#0f172a',p:'#6366f1',pd:'#4f46e5',pl:'#eef2ff',sba:'rgba(99,102,241,.18)',sbac:'#a5b4fc',label:'Midnight'},
-  ocean:   {sb:'#0c1a2e',p:'#0ea5e9',pd:'#0284c7',pl:'#f0f9ff',sba:'rgba(14,165,233,.2)',sbac:'#7dd3fc',label:'Ocean'},
-  forest:  {sb:'#0d1f17',p:'#10b981',pd:'#059669',pl:'#ecfdf5',sba:'rgba(16,185,129,.2)',sbac:'#6ee7b7',label:'Forest'},
-  rose:    {sb:'#1f0d17',p:'#f43f5e',pd:'#e11d48',pl:'#fff1f2',sba:'rgba(244,63,94,.2)',sbac:'#fda4af',label:'Rose'},
-  amber:   {sb:'#1c1205',p:'#f59e0b',pd:'#d97706',pl:'#fffbeb',sba:'rgba(245,158,11,.2)',sbac:'#fcd34d',label:'Amber'},
-  slate:   {sb:'#1e2939',p:'#3b82f6',pd:'#2563eb',pl:'#eff6ff',sba:'rgba(59,130,246,.2)',sbac:'#93c5fd',label:'Slate'},
+  lavender:{sb:'#2e2845',p:'#9b8ec4',pd:'#7c6ea8',pl:'#f5f0ff',sba:'rgba(155,142,196,.18)',sbac:'#d4c8f0',label:'Lavender'},
+  sage:    {sb:'#233027',p:'#7aaa8e',pd:'#5e9173',pl:'#f0f7f3',sba:'rgba(122,170,142,.18)',sbac:'#b8ddc8',label:'Sage'},
+  blush:   {sb:'#2e1f28',p:'#c47d97',pd:'#a8607c',pl:'#fdf0f5',sba:'rgba(196,125,151,.18)',sbac:'#e8b5c8',label:'Blush'},
+  sand:    {sb:'#2c2419',p:'#b8976a',pd:'#9c7a50',pl:'#fdf8f0',sba:'rgba(184,151,106,.18)',sbac:'#dfc9a0',label:'Sand'},
+  dusk:    {sb:'#1d2535',p:'#7aaac8',pd:'#5a8fad',pl:'#f0f6fb',sba:'rgba(122,170,200,.18)',sbac:'#b0d4e8',label:'Dusk'},
+  pebble:  {sb:'#252525',p:'#8c8c8c',pd:'#6a6a6a',pl:'#f5f5f5',sba:'rgba(140,140,140,.15)',sbac:'#c8c8c8',label:'Pebble'},
 };
-let CUR_THEME=localStorage.getItem('et_theme')||'midnight';
+let CUR_THEME=localStorage.getItem('et_theme')||'lavender';
 function applyTheme(name,save=true){
-  const t=THEMES[name]||THEMES.midnight;CUR_THEME=name;
+  const t=THEMES[name]||THEMES.lavender;CUR_THEME=name;
   const r=document.documentElement.style;
   Object.entries(t).forEach(([k,v])=>{if(k!=='label')r.setProperty('--'+k,v)});
   if(save)localStorage.setItem('et_theme',name);
@@ -1154,7 +1154,7 @@ function openProfile(){
   document.getElementById('prof-role').textContent=RLBL[CU.role]||CU.role;
   document.getElementById('av-remove').style.display=src?'inline-flex':'none';
   renderThemeSwatches();
-  openM('m-prof');
+  openM('m-profile');
 }
 function handleAvUpload(inp){
   const file=inp.files[0];if(!file)return;
@@ -1237,28 +1237,56 @@ function toggleSec(key){
 let CT=[]; // cached todos for current user
 async function loadTodos(){const{data}=await sb.from('todos').select('*').eq('userId',CU.id).order('createdAt',{ascending:false});CT=data||[]}
 async function goTodo(){await loadTodos();CP='todo';document.getElementById('main').innerHTML=renderTodo();buildSidebar()}
+let TDF={status:'all',due:'all',q:''};
 function renderTodo(){
-  const todos=CT;
+  const now=new Date(),today=now.toISOString().slice(0,10);
+  let todos=CT;
+  // apply filters
+  if(TDF.q)todos=todos.filter(t=>t.text.toLowerCase().includes(TDF.q.toLowerCase()));
+  if(TDF.status==='open')todos=todos.filter(t=>!t.done);
+  if(TDF.status==='done')todos=todos.filter(t=>t.done);
+  if(TDF.due==='overdue')todos=todos.filter(t=>t.due&&t.due<today&&!t.done);
+  if(TDF.due==='today')todos=todos.filter(t=>t.due===today);
+  if(TDF.due==='upcoming')todos=todos.filter(t=>t.due&&t.due>today);
+  if(TDF.due==='nodue')todos=todos.filter(t=>!t.due);
   const open=todos.filter(t=>!t.done),done=todos.filter(t=>t.done);
-  const row=t=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:7px;background:${t.done?'var(--g50)':'#fff'};border:1px solid var(--g200);margin-bottom:6px">
+  const overdueCnt=CT.filter(t=>t.due&&t.due<today&&!t.done).length;
+  const row=t=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:7px;background:${t.done?'var(--g50)':'#fff'};border:1px solid ${t.due&&t.due<today&&!t.done?'var(--red)':'var(--g200)'};margin-bottom:6px">
     <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" style="width:16px;height:16px;cursor:pointer;accent-color:var(--p)">
     <div style="flex:1">
       <div style="font-size:13px;font-weight:500;color:${t.done?'var(--g400)':'var(--g800)'};${t.done?'text-decoration:line-through':''}">${t.text}</div>
-      ${t.due?`<div style="font-size:11px;color:${!t.done&&new Date(t.due)<new Date()?'var(--red)':'var(--g400)'};margin-top:2px">📅 ${new Date(t.due).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>`:''}
+      ${t.due?`<div style="font-size:11px;color:${!t.done&&t.due<today?'var(--red)':'var(--g400)'};margin-top:2px">📅 ${new Date(t.due+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}${!t.done&&t.due<today?' · Overdue':t.due===today?' · Today':''}</div>`:''}
     </div>
     <button onclick="delTodo('${t.id}')" style="background:none;border:none;color:var(--g300);font-size:16px;cursor:pointer;line-height:1" title="Delete">✕</button>
   </div>`;
-  return `<div class="ph"><div><div class="ptitle">📝 My To-Do</div><div class="psub">Private — only you can see this</div></div></div>
+  const fBtn=(label,key,val)=>`<button class="btn btn-sm" style="background:${TDF[key]===val?'var(--p)':'var(--g100)'};color:${TDF[key]===val?'#fff':'var(--g600)'};border:none" onclick="TDF['${key}']='${val}';document.getElementById('main').innerHTML=renderTodo()">${label}</button>`;
+  return `<div class="ph"><div><div class="ptitle">📝 My To-Do</div><div class="psub">${CT.length} tasks total${overdueCnt?` · <span style="color:var(--red);font-weight:700">${overdueCnt} overdue</span>`:''}</div></div>
+    <button class="btn btn-g" onclick="exportTodos()">⬇ Export</button></div>
   <div class="card"><div class="cb">
-    <div style="display:flex;gap:8px;margin-bottom:4px">
-      <input id="td-txt" class="inp" style="flex:1" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTodo()">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <input id="td-txt" class="inp" style="flex:1;min-width:180px" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTodo()">
       <input id="td-due" type="date" class="inp" style="width:140px" title="Due date (optional)">
       <button class="btn btn-p btn-sm" onclick="addTodo()">+ Add</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <input class="ss-inp" style="width:160px" placeholder="🔍 Search…" oninput="TDF.q=this.value;document.getElementById('main').innerHTML=renderTodo()" value="${TDF.q}">
+      <span style="font-size:11px;color:var(--g400);font-weight:600">STATUS:</span>
+      ${fBtn('All','status','all')}${fBtn('Pending','status','open')}${fBtn('Done','status','done')}
+      <span style="font-size:11px;color:var(--g400);font-weight:600;margin-left:4px">DUE:</span>
+      ${fBtn('All','due','all')}${fBtn('Overdue','due','overdue')}${fBtn('Today','due','today')}${fBtn('Upcoming','due','upcoming')}${fBtn('No Date','due','nodue')}
     </div>
   </div></div>
   ${open.length?`<div class="card"><div class="ch"><span class="ct">Pending (${open.length})</span></div><div class="cb">${open.map(row).join('')}</div></div>`:''}
   ${done.length?`<div class="card"><div class="ch"><span class="ct" style="color:var(--g400)">Completed (${done.length})</span><button class="btn btn-o btn-sm" onclick="clearDoneTodos()">Clear all</button></div><div class="cb">${done.map(row).join('')}</div></div>`:''}
-  ${!todos.length?`<div class="card"><div class="empty"><div class="ei">📝</div><div class="em">No tasks yet. Add one above!</div></div></div>`:''}`;
+  ${!todos.length&&CT.length?`<div class="card"><div class="empty"><div class="ei">🔍</div><div class="em">No tasks match the filter.</div></div></div>`:''}
+  ${!CT.length?`<div class="card"><div class="empty"><div class="ei">📝</div><div class="em">No tasks yet. Add one above!</div></div></div>`:''}`;
+}
+function exportTodos(){
+  const rows=CT.map(t=>({'Task':t.text,'Status':t.done?'Done':'Pending','Due Date':t.due||'—','Created':new Date(t.createdAt).toLocaleDateString('en-IN')}));
+  if(!rows.length){showToast('No tasks to export','⚠️');return}
+  const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:40},{wch:10},{wch:14},{wch:14}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'To-Do');
+  XLSX.writeFile(wb,`todo_${CU.nick||CU.name}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 async function addTodo(){
   const txt=document.getElementById('td-txt')?.value?.trim(),due=document.getElementById('td-due')?.value;
