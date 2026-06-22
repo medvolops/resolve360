@@ -545,20 +545,24 @@ function applyF(list){return list.filter(e=>{
 
 // Dashboard filter
 function dashFBar(){
-  const users=DB.users();
+  const users=DB.users(),cats=Object.keys(DB.cats()),cos=DB.cos();
   return `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;align-items:center">
     <input id="dash-q" class="ss-inp" style="width:150px" placeholder="🔍 Search…" value="${DF.q||''}" oninput="debouncedQ('DF',this.value,'dash-q')">
     ${mkMSS('pri',['','Urgent','High','Medium','Low'],['Priority','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'],'DF')}
-    ${mkMSS('rby',['',...users.map(u=>u.id)],['Raised By',...users.map(u=>u.nick||u.name)],'DF')}
+    ${mkMSS('st',['','pending','processing','onhold','closed'],['Status','Pending','Processing','On Hold','Closed'],'DF')}
+    ${mkMSS('cat',['',...cats],['Category',...cats],'DF')}
+    ${mkMSS('co',['',...cos],['Company',...cos],'DF')}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)],'DF')}
     <button class="btn btn-o btn-sm" onclick="DF={};refreshView()">✕ Clear</button>
   </div>`;
 }
 function applyDF(list){return list.filter(e=>{
   const q=(DF.q||'').toLowerCase();
-  if(q&&![e.id,e.company,e.desc].join(' ').toLowerCase().includes(q))return false;
+  if(q&&![e.id,e.company,e.desc,e.category,e.subcategory].join(' ').toLowerCase().includes(q))return false;
   if(DF.pri?.length&&!DF.pri.includes(e.priority))return false;
-  if(DF.rby?.length&&!DF.rby.includes(e.raisedBy))return false;
+  if(DF.st?.length&&!DF.st.includes(e.status))return false;
+  if(DF.cat?.length&&!DF.cat.includes(e.category))return false;
+  if(DF.co?.length&&!DF.co.includes(e.company))return false;
   if(DF.uid?.length&&!DF.uid.includes(e.assignedTo))return false;
   return true})}
 
@@ -730,7 +734,7 @@ function renderTeamDash(){
   const es=DB.escs(),st=mySubtree(),users=DB.users().filter(u=>st.includes(u.id)&&u.id!==CU.id);
   let h=`<div class="ph"><div><div class="ptitle">👥 Team Overview</div><div class="psub">My Reportees</div></div></div><div class="team-grid">`;
   users.forEach(u=>{const asgn=es.filter(e=>e.assignedTo===u.id);const [p,pr,ho]=[['pending'],['processing'],['onhold']].map(([s])=>asgn.filter(e=>e.status===s).length);h+=`<div class="tm">${av(u.id,40)}<div class="tname">${u.nick||u.name}</div><div class="trole">${RLBL[u.role]}</div><div style="display:flex;gap:12px;justify-content:center;margin-top:10px"><div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--red)">${p}</div><div style="font-size:10px;color:var(--g400)">Pend</div></div><div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--p)">${pr}</div><div style="font-size:10px;color:var(--g400)">Proc</div></div><div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--violet)">${ho}</div><div style="font-size:10px;color:var(--g400)">Hold</div></div></div></div>`});
-  h+=`</div>`;const raw=es.filter(e=>st.includes(e.raisedBy)&&e.status!=='closed');const list=applyF(raw);
+  h+=`</div>`;const raw=es.filter(e=>(st.includes(e.raisedBy)||st.includes(e.assignedTo))&&e.status!=='closed');const list=applyF(raw);
   h+=`<div class="sdiv">All Open (${list.length}/${raw.length})</div>`+fBar()+escTable(list,true,true,'team-dashboard');return h;
 }
 function renderMgrOverview(){
@@ -738,7 +742,21 @@ function renderMgrOverview(){
   let h=`<div class="ph"><div><div class="ptitle">🏢 All Teams Overview</div></div></div>
   <div class="stats" style="grid-template-columns:repeat(4,1fr)">${sc('Total Open','📋',es.filter(e=>e.status!=='closed').length,'red','Active','mgr-overview')}${sc('Pending','⏳',es.filter(e=>e.status==='pending').length,'amber','','mgr-overview')}${sc('Processing','🔄',es.filter(e=>e.status==='processing').length,'blue','','mgr-overview')}${sc('On Hold','⏸',es.filter(e=>e.status==='onhold').length,'violet','','mgr-overview')}</div>`;
   const raw=es.filter(e=>e.status!=='closed');const list=applyF(raw);h+=fBar();
-  teams.forEach(team=>{const tl=list.filter(e=>uTeams(getU(e.raisedBy)).includes(team));if(!tl.length)return;h+=`<div class="sdiv">${team} · ${tl.length}</div>`+escTable(tl,true,true,`mgr_${team}`)});
+  const shown=new Set();
+  teams.forEach(team=>{
+    // match by assignee's team (who is handling it) OR raiser's team
+    const tl=list.filter(e=>{
+      const inTeam=uTeams(getU(e.assignedTo)).includes(team)||uTeams(getU(e.raisedBy)).includes(team);
+      return inTeam;
+    });
+    if(!tl.length)return;
+    tl.forEach(e=>shown.add(e.id));
+    h+=`<div class="sdiv">${team} · ${tl.length}</div>`+escTable(tl,true,true,`mgr_${team}`);
+  });
+  // Catch-all: any ESC not appearing in any team bucket (raised/assigned by teamless users like senior mgmt)
+  const rest=list.filter(e=>!shown.has(e.id));
+  if(rest.length)h+=`<div class="sdiv">📌 Other / No Team (${rest.length})</div>`+escTable(rest,true,true,'mgr_other');
+  if(!list.length)h+=`<div class="card"><div class="empty"><div class="ei">📭</div><div class="em">No open escalations.</div></div></div>`;
   return h;
 }
 function renderMgrAgents(){
@@ -833,13 +851,18 @@ function openDetail(id){
   if(isTeam()&&e.status!=='closed'){
     const st=mySubtree();
     const raisedByMyTeam=st.includes(e.raisedBy);
-    // TL: if request came from outside their team, can only reassign within own team
-    // If raised by own team (or manager/senior), can reassign to anyone
     const isTL=myAcc()===2;
     const pool=isTL&&!raisedByMyTeam
       ? DB.users().filter(u=>u.id!==e.assignedTo&&st.includes(u.id))
       : DB.users().filter(u=>u.id!==e.assignedTo);
-    reassignHtml=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">🔄 Reassign${isTL&&!raisedByMyTeam?' <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--g400)">(limited to your team)</span>':''}</div><div style="display:flex;gap:8px"><select id="reassign-sel" class="inp" style="flex:1"><option value="">— Select —</option>${pool.map(u=>`<option value="${u.id}">${u.nick||u.name} — ${uTeams(u).join(', ')}</option>`).join('')}</select><button class="btn btn-p btn-sm" onclick="showRmk('Reassign remarks',r=>doReassign('${id}',r))">Go</button></div></div>`;
+    M.reassign='';
+    reassignHtml=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)">
+      <div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">🔄 Reassign${isTL&&!raisedByMyTeam?' <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--g400)">(limited to your team)</span>':''}</div>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1">${mkMS('reassign',['',...pool.map(u=>u.id)],['— Select person —',...pool.map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)])}</div>
+        <button class="btn btn-p btn-sm" onclick="showRmk('Reassign remarks',r=>doReassign('${id}',r))">Go</button>
+      </div>
+    </div>`;
   }
 
   const rmkBox=`<div id="rmk-box" class="rmk-box" style="display:none"><label id="rmk-lbl"></label><textarea id="rmk-txt" class="rmk-ta" placeholder="Add remarks…"></textarea><div style="margin-top:8px;display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="doRmk()">✓ Confirm</button><button class="btn btn-o btn-sm" onclick="cancelRmk()">Cancel</button></div></div>`;
@@ -918,7 +941,7 @@ function escalateEsc(id,rmk){
   closeM('m-detail');showToast(`Escalated to ${tgt.name}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 function doReassign(id,rmk){
-  const sel=document.getElementById('reassign-sel')?.value;if(!sel){showToast('Select a person','⚠️');return}
+  const sel=M.reassign;if(!sel){showToast('Select a person','⚠️');return}
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   const oldNm=getU(e.assignedTo).name,nU=getU(sel);
   const pt=e.passedThrough||[];if(!pt.includes(e.assignedTo))pt.push(e.assignedTo);
