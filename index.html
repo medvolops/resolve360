@@ -520,7 +520,7 @@ function setPage(k,p){PAGE[k]=p;refreshView()}
 function fBar(){
   const users=DB.users(),cats=Object.keys(DB.cats()),teams=[...new Set(users.flatMap(u=>uTeams(u)))];
   return `<div class="fbar">
-    <input class="ss-inp" style="width:160px" placeholder="🔍 Search…" value="${F.q||''}" oninput="F.q=this.value;refreshView()">
+    <input id="fbar-q" class="ss-inp" style="width:160px" placeholder="🔍 Search…" value="${F.q||''}" oninput="debouncedQ('F',this.value,'fbar-q')">
     ${mkMSS('pri',['','Urgent','High','Medium','Low'],['All Priority','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'])}
     ${mkMSS('st',['','pending','processing','onhold','closed'],['All Status','Pending','Processing','On Hold','Closed'])}
     ${mkMSS('cat',['',...cats],['All Category',...cats])}
@@ -547,7 +547,7 @@ function applyF(list){return list.filter(e=>{
 function dashFBar(){
   const users=DB.users();
   return `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;align-items:center">
-    <input class="ss-inp" style="width:150px" placeholder="🔍 Search…" value="${DF.q||''}" oninput="DF.q=this.value;refreshView()">
+    <input id="dash-q" class="ss-inp" style="width:150px" placeholder="🔍 Search…" value="${DF.q||''}" oninput="debouncedQ('DF',this.value,'dash-q')">
     ${mkMSS('pri',['','Urgent','High','Medium','Low'],['Priority','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'],'DF')}
     ${mkMSS('rby',['',...users.map(u=>u.id)],['Raised By',...users.map(u=>u.nick||u.name)],'DF')}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)],'DF')}
@@ -1573,6 +1573,18 @@ function exportTodos(){
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:28},{wch:40},{wch:10},{wch:14},{wch:14}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'To-Do');
   XLSX.writeFile(wb,`todo_${CU.nick||CU.name}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// Debounced text-search: updates state immediately, re-renders after pause, restores focus
+let _dqT, _dqId=null;
+function debouncedQ(ns,val,elId){
+  window[ns].q=val; _dqId=elId;
+  clearTimeout(_dqT);
+  _dqT=setTimeout(()=>{
+    PAGE={};
+    refreshView();
+    setTimeout(()=>{const el=document.getElementById(_dqId);if(el){const p=el.value.length;el.focus();try{el.setSelectionRange(p,p)}catch(e){}} _dqId=null},0);
+  },320);
 }
 
 function refreshView(){
