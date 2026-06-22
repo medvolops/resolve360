@@ -71,6 +71,9 @@ a{cursor:pointer}
 }
 .sidebar:hover,.sidebar.pinned{width:220px;overflow-y:auto;padding:10px 8px 20px}
 .sidebar:not(.pinned):hover{box-shadow:6px 0 20px rgba(0,0,0,.08)}
+/* Prevent hover-expand immediately after collapse */
+.sidebar.sb-just-collapsed{width:54px!important;overflow:hidden!important;padding:10px 4px 20px!important}
+.sidebar.sb-just-collapsed .ni-txt,.sidebar.sb-just-collapsed .s-raise-txt,.sidebar.sb-just-collapsed .s-hdr-lbl,.sidebar.sb-just-collapsed .s-hdr-arrow,.sidebar.sb-just-collapsed .nb{opacity:0!important}
 .sidebar{border-right:1px solid #f0e6c8}
 /* Main always offset 54px; extra when sidebar pinned */
 .main{position:absolute;left:54px;right:0;top:0;bottom:0;overflow-y:auto;padding:22px;transition:left .22s cubic-bezier(.4,0,.2,1)}
@@ -166,10 +169,11 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 .ss-wrap{position:relative;display:inline-block}
 .ss-inp{font-size:12px;padding:6px 10px;border:1.5px solid var(--g200);border-radius:var(--r);outline:none;width:150px;transition:border .15s;cursor:pointer;background:#fff}
 .ss-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
-.ss-drop{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--g200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:600;min-width:180px;max-height:220px;overflow-y:auto;display:none}
+.ss-drop{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--g200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:600;min-width:190px;max-height:260px;overflow-y:auto;display:none}
 .ss-drop.open{display:block}
+.ss-search{width:100%;box-sizing:border-box;padding:7px 10px;border:none;border-bottom:1px solid var(--g100);font-size:12px;outline:none;background:#fafafa;color:var(--g800)}
 .ss-opt{padding:8px 12px;font-size:13px;cursor:pointer;color:var(--g700);transition:background .1s}
-.ss-opt:hover,.ss-opt.selected{background:var(--pl);color:var(--p)}
+.ss-opt:hover,.ss-opt.selected,.ss-opt.sel{background:var(--pl);color:var(--p)}
 
 /* ACTIVITY */
 .act{display:flex;flex-direction:column}
@@ -214,6 +218,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 .tm .tname{font-size:13px;font-weight:700;margin-top:7px}.tm .trole{font-size:11px;color:var(--g400)}
 #toast{position:fixed;bottom:20px;right:20px;background:var(--g900);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:9999;display:none;align-items:center;gap:8px;max-width:300px;animation:su .2s ease}
 @keyframes su{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -240,11 +245,21 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
   </div>
 </div>
 
+<div id="app-loading" style="display:none;position:fixed;inset:0;background:#fffdf5;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px">
+  <div style="font-size:26px;font-weight:800;color:var(--p)">Resolve <span style="color:var(--g400)">360</span></div>
+  <div style="width:44px;height:44px;border:4px solid var(--pl);border-top-color:var(--p);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+  <div id="app-loading-msg" style="font-size:13px;color:var(--g500)">Loading your session…</div>
+</div>
+
 <div id="app">
   <div class="topbar">
     <div class="topbar-brand" style="font-size:17px">Resolve <span class="brand-360">360</span></div>
     <div class="topbar-right">
-      <input id="esc-s" class="ss-inp" placeholder="🔍 Search ESC-ID…" style="width:160px;font-size:12px" onkeydown="if(event.key==='Enter')searchEsc(this.value)">
+      <div id="esc-search-wrap" style="position:relative;display:flex;gap:4px">
+        <input id="esc-search-inp" class="ss-inp" placeholder="Search ID, company…" style="width:190px;font-size:12px" onkeydown="if(event.key==='Enter')doEscSearch();if(event.key==='Escape')closeEscSearch()" autocomplete="off">
+        <button class="btn btn-p btn-sm" onclick="doEscSearch()" style="white-space:nowrap">🔍</button>
+        <div id="esc-search-res" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--g200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:900;width:340px;max-height:320px;overflow-y:auto"></div>
+      </div>
       <button class="bell-btn" onclick="showNotifs()">🔔<span class="bell-dot" id="bdot" style="display:none"></span></button>
       <div class="tbprofile" onclick="openProfile()">
         <div id="t-av"></div>
@@ -416,21 +431,64 @@ async function seedIfEmpty(){
 
 function startRealtime(){
   sb.channel('live')
-    .on('postgres_changes',{event:'*',schema:'public',table:'escalations'},async()=>{
+    .on('postgres_changes',{event:'*',schema:'public',table:'escalations'},async({new:rec,eventType})=>{
+      const prev=C.escs.find(e=>e.id===rec?.id);
       const{data}=await sb.from('escalations').select('*').order('createdAt',{ascending:false});
       C.escs=data||[];refreshView();buildSidebar();
+      // Desktop notification: new assignment or reassignment to me
+      if(CU&&rec&&rec.assignedTo===CU.id){
+        const isNew=eventType==='INSERT'||(!prev||prev.assignedTo!==CU.id);
+        if(isNew)deskNotif(`📋 New escalation assigned`,`${rec.id} — ${rec.company||''}`,rec.id);
+      }
     })
-    .on('postgres_changes',{event:'*',schema:'public',table:'notifications'},async()=>{
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications'},async({new:rec})=>{
       const{data}=await sb.from('notifications').select('*').order('time',{ascending:false});
       C.notifs=data||[];buildSidebar();checkDot();
+      // Desktop notification for in-app notification
+      if(CU&&rec&&rec.forUser===CU.id)deskNotif('🔔 Resolve360',rec.text||'You have a new notification',rec.escId);
     })
     .subscribe();
 }
 
 const bcast=()=>{};
 
+// ── USER CODE AUTO-GENERATION ──
+function genUserCode(name,takenSet){
+  const parts=(name||'').trim().toUpperCase().replace(/[^A-Z\s]/g,'').split(/\s+/).filter(Boolean);
+  const a=parts[0]||'X',b=parts[1]||parts[0]||'X',c=parts[2]||'';
+  const try_=(...codes)=>{for(const code of codes){const t=code.replace(/[^A-Z]/g,'');if(t.length>=2&&!takenSet.has(t))return t}return null};
+  const found=try_(
+    a[0]+b[0],           // initials: SY (Surya → SY)
+    a.slice(0,2),        // first 2: SU
+    a[0]+b.slice(0,2),   // first+2last: SKA
+    a.slice(0,3),        // first 3: SUR
+    a[0]+(c[0]||b[1]||b[0]), // variations
+    b[0]+a[0],           // reversed initials
+    a[0]+b[0]+(c[0]||''),// 3-part: SKR
+  );
+  if(found)return found;
+  // Exhaustive fallback: scan through AA–ZZ then AAA–ZZZ
+  const alpha='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for(const x of alpha)for(const y of alpha){const code=a[0]+x+y;if(!takenSet.has(code))return code}
+  return 'ZZZ';
+}
+async function ensureUserCodes(){
+  const us=DB.users(),takenSet=new Set(us.map(u=>u.userCode).filter(Boolean));
+  const toUpdate=[];
+  for(const u of us){
+    if(!u.userCode){
+      const code=genUserCode(u.name||u.nick||'',takenSet);
+      u.userCode=code;takenSet.add(code);toUpdate.push(u);
+    }
+  }
+  if(toUpdate.length){
+    const BATCH=50;
+    for(let i=0;i<toUpdate.length;i+=BATCH)await sb.from('users').upsert(toUpdate.slice(i,i+BATCH));
+  }
+}
+
 // ── ID ──
-function genId(){const d=new Date(),dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0'),yy=String(d.getFullYear()).slice(-2);const pfx=`ESC-${dd}${mm}${yy}-`;const c=C.escs.filter(e=>e.id.startsWith(pfx)).length+1;return `${pfx}${String(c).padStart(4,'0')}`}
+function genId(){const d=new Date(),dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0'),yy=String(d.getFullYear()).slice(-2);const code=(CU?.userCode||'XX').toUpperCase().slice(0,3);const pfx=`ESC-${dd}${mm}${yy}-${code}`;const c=C.escs.filter(e=>e.id.startsWith(pfx)).length+1;return `${pfx}${String(c).padStart(4,'0')}`}
 
 // ── HELPERS ──
 const getU=id=>DB.users().find(u=>u.id===id)||{name:'Unknown',color:'#94a3b8',teams:[]};
@@ -448,24 +506,10 @@ const pbadge=p=>{const m={Urgent:'b-urgent',High:'b-high',Medium:'b-medium',Low:
 function addNotif(forU,escId,text,type='in'){const n={id:'n'+Date.now(),forUser:forU,escId,text,time:new Date().toISOString(),read:false,type};C.notifs.unshift(n);sb.from('notifications').insert(n).then(r=>r.error&&console.error('addNotif',r.error))}
 const sc=(label,icon,val,color,desc,page)=>`<div class="sc ${color}" onclick="navigate('${page}')"><div class="slabel">${icon} ${label}</div><div class="sval">${val}</div><div class="sdesc">${desc}</div></div>`;
 
-// ── SEARCHABLE SELECT ──
-let _ssData={};
-function mkSS(key,vals,labels,obj='F',ph=''){
-  const id=`ss_${key}_${obj}`,cur=(obj==='F'?F:obj==='DF'?DF:RF)[key]||'';
-  const curLbl=cur?labels[vals.indexOf(cur)]:labels[0];
-  _ssData[id]={key,vals,labels,obj};
-  return `<div class="ss-wrap" id="${id}">
-    <input class="ss-inp" id="${id}_i" value="${curLbl}" placeholder="${labels[0]}" onfocus="openSS('${id}')" oninput="filterSS('${id}')" onblur="setTimeout(()=>closeSS('${id}'),200)" readonly>
-    <div class="ss-drop" id="${id}_d">${vals.map((v,i)=>`<div class="ss-opt${v===cur?' selected':''}" onclick="pickSS('${id}','${v}','${labels[i]}')">${labels[i]}</div>`).join('')}</div>
-  </div>`;
-}
-function openSS(id){document.getElementById(id+'_d').classList.add('open');document.getElementById(id+'_i').removeAttribute('readonly');document.getElementById(id+'_i').select()}
-function closeSS(id){const d=document.getElementById(id+'_d');if(d)d.classList.remove('open');const i=document.getElementById(id+'_i');if(i)i.setAttribute('readonly','');const {key,vals,labels,obj}=_ssData[id]||{};if(key){const cur=(obj==='F'?F:obj==='DF'?DF:RF)[key]||'';if(i)i.value=cur?labels[vals.indexOf(cur)]:labels[0]}}
-function filterSS(id){const q=document.getElementById(id+'_i').value.toLowerCase();document.querySelectorAll(`#${id}_d .ss-opt`).forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(q)?'':'none'});document.getElementById(id+'_d').classList.add('open')}
-function pickSS(id,val,lbl){const {key,obj}=_ssData[id]||{};(obj==='F'?F:obj==='DF'?DF:RF)[key]=val;closeSS(id);setTimeout(refreshView,50)}
 
 // ── STATE ──
-let CU=null,CP='dashboard',_pa=null,adminTab='users',catTab='',PAGE={},F={},DF={},RF={},sC={};
+let CU=null,CP='dashboard',_pa=null,adminTab='users',catTab='',PAGE={},sC={};
+var F={},DF={},RF={};
 
 // ── PAGINATION ──
 const PER=15;
@@ -514,23 +558,33 @@ async function doLogin(){
   try{
     await loadCache();
     await seedIfEmpty();
+    await ensureUserCodes();
     const u=C.users.find(x=>x.mobile===m&&x.pass===p);
     if(!u){showErr('Invalid credentials.');return}
     DB.setSess(u.id);startSess(u);
   }catch(e){console.error(e);showErr('Connection error. Check your internet and try again.');}
 }
-function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime()}
+function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm()}
+function requestNotifPerm(){if(!('Notification' in window))return;if(Notification.permission==='default'){setTimeout(()=>Notification.requestPermission(),2000)}}
+function deskNotif(title,body,escId){if(Notification.permission!=='granted')return;const n=new Notification(title,{body,icon:'https://surya-medvol.github.io/resolve360/favicon.ico',tag:escId||'resolve360'});n.onclick=()=>{window.focus();if(escId)openDetail(escId);n.close()}}
 function renderTopbar(){document.getElementById('t-av').innerHTML=av(CU.id,32);document.getElementById('t-name').textContent=CU.nick||CU.name}
 function doLogout(){DB.clrSess();CU=null;document.getElementById('login').style.display='flex';document.getElementById('app').classList.remove('v');showLogin()}
+function showAppLoading(msg){const el=document.getElementById('app-loading');el.style.display='flex';document.getElementById('app-loading-msg').textContent=msg||'Loading…';document.getElementById('login').style.display='none';document.getElementById('app').style.display='none'}
+function hideAppLoading(){document.getElementById('app-loading').style.display='none'}
 window.addEventListener('load',async()=>{
   const sid=DB.sess();
   if(sid){
-    showToast('Loading…','⏳');
+    showAppLoading('Signing you in…');
     try{
-      await loadCache();await seedIfEmpty();
+      await loadCache();
       const u=C.users.find(x=>x.id===sid);
-      if(u){startSess(u);return}
-    }catch(e){console.error(e);}
+      if(u){
+        showAppLoading('Loading data…');
+        await seedIfEmpty();await ensureUserCodes();
+        hideAppLoading();startSess(u);return;
+      }else{DB.clrSess();}
+    }catch(e){console.error('Auto-login failed:',e);DB.clrSess();}
+    hideAppLoading();
   }
   document.getElementById('login').style.display='flex';document.getElementById('app').style.display='none';
 });
@@ -550,7 +604,13 @@ function applySbMode(){
   sb.classList.toggle('pinned',sbPinned);
   lay.classList.toggle('sb-open',sbPinned);
 }
-function toggleSbPin(){sbPinned=!sbPinned;localStorage.setItem('et_sbp',sbPinned?'1':'0');applySbMode();buildSidebar()}
+function toggleSbPin(){
+  sbPinned=!sbPinned;localStorage.setItem('et_sbp',sbPinned?'1':'0');applySbMode();buildSidebar();
+  if(!sbPinned){
+    const el=document.getElementById('sidebar');
+    if(el){el.classList.add('sb-just-collapsed');el.addEventListener('mouseleave',()=>el.classList.remove('sb-just-collapsed'),{once:true})}
+  }
+}
 
 function buildSidebar(){
   if(!CU)return;const es=DB.escs(),uid=CU.id;
@@ -605,7 +665,7 @@ function navigate(page){if(page!==CP){F={};PAGE={};}CP=page;buildSidebar();
   document.getElementById('main').innerHTML=(r[page]||renderDashboard)();
   if(page==='reports')setTimeout(initCharts,80);
 }
-function refreshView(){if(CU)navigate(CP)}
+let _rvT;function refreshView(){if(CU){clearTimeout(_rvT);_rvT=setTimeout(()=>navigate(CP),60)}}
 function searchEsc(v){const e=DB.escs().find(x=>x.id===v.trim().toUpperCase());e?openDetail(e.id):showToast('ESC ID not found','⚠️')}
 
 // ── DASHBOARD ──
@@ -747,8 +807,15 @@ function openDetail(id){
 
   let reassignHtml='';
   if(isTeam()&&e.status!=='closed'){
-    const others=DB.users().filter(u=>u.id!==e.assignedTo);
-    reassignHtml=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">🔄 Reassign</div><div style="display:flex;gap:8px"><select id="reassign-sel" class="inp" style="flex:1"><option value="">— Select —</option>${others.map(u=>`<option value="${u.id}">${u.nick||u.name}</option>`).join('')}</select><button class="btn btn-p btn-sm" onclick="showRmk('Reassign remarks',r=>doReassign('${id}',r))">Go</button></div></div>`;
+    const st=mySubtree();
+    const raisedByMyTeam=st.includes(e.raisedBy);
+    // TL: if request came from outside their team, can only reassign within own team
+    // If raised by own team (or manager/senior), can reassign to anyone
+    const isTL=myAcc()===2;
+    const pool=isTL&&!raisedByMyTeam
+      ? DB.users().filter(u=>u.id!==e.assignedTo&&st.includes(u.id))
+      : DB.users().filter(u=>u.id!==e.assignedTo);
+    reassignHtml=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">🔄 Reassign${isTL&&!raisedByMyTeam?' <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--g400)">(limited to your team)</span>':''}</div><div style="display:flex;gap:8px"><select id="reassign-sel" class="inp" style="flex:1"><option value="">— Select —</option>${pool.map(u=>`<option value="${u.id}">${u.nick||u.name} — ${uTeams(u).join(', ')}</option>`).join('')}</select><button class="btn btn-p btn-sm" onclick="showRmk('Reassign remarks',r=>doReassign('${id}',r))">Go</button></div></div>`;
   }
 
   const rmkBox=`<div id="rmk-box" class="rmk-box" style="display:none"><label id="rmk-lbl"></label><textarea id="rmk-txt" class="rmk-ta" placeholder="Add remarks…"></textarea><div style="margin-top:8px;display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="doRmk()">✓ Confirm</button><button class="btn btn-o btn-sm" onclick="cancelRmk()">Cancel</button></div></div>`;
@@ -831,8 +898,16 @@ function doReassign(id,rmk){
 }
 
 // ── REPORTS ──
+// For TL, scope to their subtree; managers/senior see all
+function scopedEscs(){
+  if(isSenior()||myAcc()===3)return DB.escs();
+  if(myAcc()===2){const st=mySubtree();return DB.escs().filter(e=>st.includes(e.assignedTo)||st.includes(e.raisedBy))}
+  return DB.escs().filter(e=>e.raisedBy===CU.id||e.assignedTo===CU.id);
+}
 function renderReports(){
-  const users=DB.users(),teams=[...new Set(users.flatMap(u=>uTeams(u)))],cats=Object.keys(DB.cats());
+  const st=myAcc()===2?mySubtree():null;
+  const users=st?DB.users().filter(u=>st.includes(u.id)):DB.users();
+  const teams=[...new Set(users.flatMap(u=>uTeams(u)))],cats=Object.keys(DB.cats());
   return `<div class="ph"><div><div class="ptitle">📈 Reports & Analytics</div></div><button class="btn btn-g" onclick="exportXLSX()">⬇ Export Excel</button></div>
   <div class="rpt-filters">
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--g500)">📅 Date:</div>
@@ -859,7 +934,8 @@ function renderReports(){
   </table></div></div>`;
 }
 function applyRF(list){
-  return list.filter(e=>{
+  const base=list||scopedEscs();
+  return base.filter(e=>{
     if(RF.from&&new Date(e.createdAt)<new Date(RF.from))return false;
     if(RF.to&&new Date(e.createdAt)>new Date(RF.to+'T23:59:59'))return false;
     if(RF.st&&e.status!==RF.st)return false;
@@ -871,7 +947,7 @@ function applyRF(list){
   });
 }
 function initCharts(){
-  const es=applyRF(DB.escs());
+  const es=applyRF(scopedEscs());
   const clrs=['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#f97316'];
   const mkBar=(id,labels,data,bg)=>{const el=document.getElementById(id);if(!el)return;if(el._ch)el._ch.destroy();el._ch=new Chart(el,{type:'bar',data:{labels,datasets:[{data,backgroundColor:bg||clrs,borderRadius:5}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0,font:{size:10}},grid:{color:'#f1f5f9'}},x:{ticks:{font:{size:10}}}}}})};
   const mkD=(id,labels,data)=>{const el=document.getElementById(id);if(!el)return;if(el._ch)el._ch.destroy();el._ch=new Chart(el,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:clrs,borderWidth:2}]},options:{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}}}}})};
@@ -881,7 +957,8 @@ function initCharts(){
   const teams=[...new Set(DB.users().flatMap(u=>uTeams(u)))];mkBar('c-teams',teams,teams.map(t=>es.filter(e=>uTeams(getU(e.raisedBy)).includes(t)).length));
   // Agent table
   const tbody=document.getElementById('rpt-agents');if(!tbody)return;
-  const agents=DB.users().filter(u=>RA[u.role]<3);
+  const st2=myAcc()===2?mySubtree():null;
+  const agents=(st2?DB.users().filter(u=>st2.includes(u.id)):DB.users()).filter(u=>RA[u.role]<3);
   tbody.innerHTML=agents.map(u=>{
     const asgn=applyRF(DB.escs().filter(e=>e.assignedTo===u.id));const cl=asgn.filter(e=>e.status==='closed');
     const tats=cl.map(e=>{const ca=[...e.activity].reverse().find(a=>a.text.startsWith('Closed'));return ca?Math.round((new Date(ca.time)-new Date(e.createdAt))/3600000):null}).filter(t=>t!==null);
@@ -892,7 +969,7 @@ function initCharts(){
 
 // ── EXCEL EXPORT ──
 function exportXLSX(){
-  const es=applyRF(DB.escs());
+  const es=applyRF(scopedEscs());
   const rows=es.map(e=>({
     'ID':e.id,'Company':e.company,'Category':e.category,'Sub-Category':e.subcategory,
     'Priority':e.priority,'Status':e.status,'Raised By':getU(e.raisedBy).name,
@@ -932,8 +1009,8 @@ function renderAdminUsers(){
     <div class="fgroup"><label>Avatar Color</label><input id="uf-color" type="color" value="#6366f1" style="padding:3px;height:40px;width:100%;border:1.5px solid var(--g200);border-radius:var(--r)"></div>
     <input type="hidden" id="uf-id">
   </div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p btn-sm" onclick="saveUser()">Save</button><button class="btn btn-o btn-sm" onclick="document.getElementById('uf-wrap').style.display='none'">Cancel</button></div></div></div>
-  <div class="tw"><table><thead><tr><th></th><th>Name</th><th>Mobile</th><th>Role</th><th>Teams</th><th>Reports To</th><th>Password</th><th></th></tr></thead>
-  <tbody>${us.map(u=>`<tr><td>${av(u.id,26)}</td><td><strong>${u.name}</strong>${u.nick?`<div style="font-size:11px;color:var(--p)">${u.nick}</div>`:''}</td><td>${u.mobile}</td><td>${RLBL[u.role]||u.role}</td><td>${uTeams(u).join(', ')}</td><td style="font-size:12px;color:var(--p)">${u.reportsTo?getU(u.reportsTo).name:'—'}</td><td style="font-size:12px;color:var(--g400);font-family:monospace">${u.pass}</td><td style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="editUser('${u.id}')">Edit</button><button class="btn btn-r btn-sm" onclick="delUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  <div class="tw"><table><thead><tr><th></th><th>Name</th><th>Code</th><th>Mobile</th><th>Role</th><th>Teams</th><th>Reports To</th><th>Password</th><th></th></tr></thead>
+  <tbody>${us.map(u=>`<tr><td>${av(u.id,26)}</td><td><strong>${u.name}</strong>${u.nick?`<div style="font-size:11px;color:var(--p)">${u.nick}</div>`:''}</td><td><span style="font-size:12px;font-weight:700;font-family:monospace;color:var(--p);background:var(--pl);padding:2px 7px;border-radius:4px">${u.userCode||'—'}</span></td><td>${u.mobile}</td><td>${RLBL[u.role]||u.role}</td><td>${uTeams(u).join(', ')}</td><td style="font-size:12px;color:var(--p)">${u.reportsTo?getU(u.reportsTo).name:'—'}</td><td style="font-size:12px;color:var(--g400);font-family:monospace">${u.pass}</td><td style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="editUser('${u.id}')">Edit</button><button class="btn btn-r btn-sm" onclick="delUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function showUserForm(u){
   document.getElementById('uf-wrap').style.display='block';
@@ -951,7 +1028,12 @@ function saveUser(){
   const teams=teamsRaw.split(',').map(t=>t.trim()).filter(Boolean);
   const us=DB.users();
   if(id){const i=us.findIndex(u=>u.id===id);if(i>=0)Object.assign(us[i],{name,nick,mobile,role,pass,color,teams,reportsTo:reportsTo||''})}
-  else{if(us.find(u=>u.mobile===mobile)){showToast('Mobile taken','⚠️');return}us.push({id:'u'+Date.now(),name,nick,mobile,role,pass,color,teams,reportsTo:reportsTo||''})}
+  else{
+    if(us.find(u=>u.mobile===mobile)){showToast('Mobile taken','⚠️');return}
+    const takenSet=new Set(us.map(u=>u.userCode).filter(Boolean));
+    const userCode=genUserCode(name,takenSet);
+    us.push({id:'u'+Date.now(),name,nick,userCode,mobile,role,pass,color,teams,reportsTo:reportsTo||''})
+  }
   DB.saveU(us);showToast(id?'Updated':'Added');navigate('admin');
 }
 function delUser(id){if(!confirm('Delete?'))return;DB.saveU(DB.users().filter(u=>u.id!==id));showToast('Deleted');navigate('admin')}
@@ -1025,6 +1107,9 @@ async function importUsersCSV(input){
     if(errors.length){showImportErrors('Import Errors (fix & re-upload)',errors);closeStatus();return}
     if(!newUsers.length){showStatus('❌ No valid users found after validation',true);return}
 
+    // Auto-assign unique user codes
+    const takenSet=new Set([...existing,...newUsers].map(u=>u.userCode).filter(Boolean));
+    newUsers.forEach(u=>{if(!u.userCode){const code=genUserCode(u.name||u.nick||'',takenSet);u.userCode=code;takenSet.add(code)}});
     // Resolve reportsTo
     const allU=[...existing,...newUsers];
     newUsers.forEach(u=>{if(u._rtoMob){const m=allU.find(x=>x.mobile===u._rtoMob);if(m)u.reportsTo=m.id}delete u._rtoMob});
@@ -1163,20 +1248,23 @@ function renderThemeSwatches(){
 }
 
 // ── UNIVERSAL ESC SEARCH ──
-let _searchRes=[];
 function doEscSearch(){
-  const q=(document.getElementById('esc-search-inp').value||'').trim().toUpperCase();
-  if(!q){document.getElementById('esc-search-res').style.display='none';return}
-  _searchRes=DB.escs().filter(e=>e.id.toUpperCase().includes(q)||e.company?.toUpperCase().includes(q));
+  const raw=(document.getElementById('esc-search-inp').value||'').trim();
   const box=document.getElementById('esc-search-res');
-  if(!_searchRes.length){box.innerHTML=`<div style="padding:12px 14px;font-size:13px;color:var(--g400)">No results</div>`;box.style.display='block';return}
-  box.innerHTML=_searchRes.slice(0,8).map(e=>`<div onclick="closeEscSearch();openDetail('${e.id}')" style="padding:10px 14px;border-bottom:1px solid var(--g100);cursor:pointer;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
-    <span class="idc" style="cursor:default">${e.id}</span>
-    <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.company}</div><div style="font-size:11px;color:var(--g400)">${e.subcategory||e.category} · ${sbadge(e.status)}</div></div>
+  if(raw.length<1){box.style.display='none';return}
+  const q=raw.toUpperCase();
+  const hits=DB.escs().filter(e=>[e.id,e.company,e.category,e.subcategory,e.desc,dN(e.raisedBy),dN(e.assignedTo)].join(' ').toUpperCase().includes(q));
+  if(!hits.length){box.innerHTML=`<div style="padding:12px 14px;font-size:13px;color:var(--g400)">No results for "${raw}"</div>`;box.style.display='block';return}
+  box.innerHTML=hits.slice(0,10).map(e=>`<div onclick="closeEscSearch();openDetail('${e.id}')" style="padding:10px 14px;border-bottom:1px solid var(--g100);cursor:pointer;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
+    <span class="idc" style="cursor:default;flex-shrink:0">${e.id}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.company}</div>
+      <div style="font-size:11px;color:var(--g400)">${e.subcategory||e.category||''} · ${sbadge(e.status)}</div>
+    </div>
   </div>`).join('');
   box.style.display='block';
 }
-function closeEscSearch(){document.getElementById('esc-search-res').style.display='none';document.getElementById('esc-search-inp').value=''}
+function closeEscSearch(){const b=document.getElementById('esc-search-res');if(b)b.style.display='none';const i=document.getElementById('esc-search-inp');if(i)i.value=''}
 document.addEventListener('click',e=>{if(!e.target.closest('#esc-search-wrap'))closeEscSearch()});
 
 // ── TOAST ──
