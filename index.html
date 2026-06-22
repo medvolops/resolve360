@@ -1243,16 +1243,51 @@ async function importCatsCSV(input){
 // ── NOTIFICATIONS ──
 function checkDot(){if(!CU)return;document.getElementById('bdot').style.display=DB.notifs().filter(n=>n.forUser===CU.id&&!n.read).length?'block':'none'}
 function showNotifs(){
-  if(!CU)return;const all=DB.notifs(),mine=all.filter(n=>n.forUser===CU.id);
-  all.filter(n=>n.forUser===CU.id).forEach(n=>n.read=true);DB.saveN(all);document.getElementById('bdot').style.display='none';
+  if(!CU)return;
+  renderNotifPanel();
+  openM('m-notif');
+}
+function renderNotifPanel(){
+  if(!CU)return;
+  const all=DB.notifs(),mine=all.filter(n=>n.forUser===CU.id);
+  const unread=mine.filter(n=>!n.read), read=mine.filter(n=>n.read);
   const body=document.getElementById('notif-body');
-  if(!mine.length){body.innerHTML=`<div class="empty" style="padding:36px"><div class="ei">🔕</div><div class="em">No notifications</div></div>`;openM('m-notif');return}
   const NB={in:'#eff6ff',my:'#f0fdf4'},NR={in:'#93c5fd',my:'#86efac'},ND={in:'#2563eb',my:'#059669'};
-  body.innerHTML=mine.map(n=>`<div style="padding:12px 16px;border-bottom:1px solid var(--g100);background:${NB[n.type]||'#fff'};border-left:3px solid ${NR[n.type]||'var(--g200)'}">
-    <div style="font-size:10px;font-weight:700;color:${ND[n.type]};text-transform:uppercase;margin-bottom:3px">${n.type==='in'?'📥 Incoming':'📤 Your Request'}</div>
-    <div style="font-size:13px;color:var(--g800);line-height:1.5">${n.text}</div>
-    <div style="font-size:11px;color:var(--g400);margin-top:4px;display:flex;align-items:center;gap:10px">${timeAgo(n.time)}<button class="btn btn-o btn-sm" style="font-size:11px;padding:3px 8px" onclick="closeM('m-notif');openDetail('${n.escId}')">View →</button></div>
-  </div>`).join('');openM('m-notif');
+  const row=(n,showBtn)=>`<div style="padding:12px 16px;border-bottom:1px solid var(--g100);background:${showBtn?(NB[n.type]||'#fff'):'#fff'};border-left:3px solid ${showBtn?(NR[n.type]||'var(--g200)'):'var(--g100)'}">
+    <div style="font-size:10px;font-weight:700;color:${showBtn?(ND[n.type]||'var(--g500)'):'var(--g400)'};text-transform:uppercase;margin-bottom:3px">${n.type==='in'?'📥 Incoming':'📤 Your Request'}</div>
+    <div style="font-size:13px;color:${showBtn?'var(--g800)':'var(--g400)'};line-height:1.5">${n.text}</div>
+    <div style="font-size:11px;color:var(--g400);margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${timeAgo(n.time)}
+      <button class="btn btn-o btn-sm" style="font-size:11px;padding:3px 8px" onclick="closeM('m-notif');openDetail('${n.escId}')">View →</button>
+      ${showBtn?`<button class="btn btn-p btn-sm" style="font-size:11px;padding:3px 8px" onclick="markNotifRead('${n.id}')">✓ Mark as Read</button>`:''}
+    </div>
+  </div>`;
+  if(!mine.length){body.innerHTML=`<div class="empty" style="padding:36px"><div class="ei">🔕</div><div class="em">No notifications</div></div>`;return}
+  let html='';
+  if(unread.length){
+    html+=`<div style="padding:10px 16px;background:var(--g50);border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;font-weight:700;color:var(--g600)">🔔 New (${unread.length})</span>
+      <button class="btn btn-o btn-sm" style="font-size:11px" onclick="markAllRead()">✓ Mark All as Read</button>
+    </div>`;
+    html+=unread.map(n=>row(n,true)).join('');
+  }
+  if(read.length){
+    html+=`<div style="padding:10px 16px;background:var(--g50);border-bottom:1px solid var(--g100)"><span style="font-size:12px;font-weight:700;color:var(--g400)">📂 Already Read (${read.length})</span></div>`;
+    html+=read.map(n=>row(n,false)).join('');
+  }
+  body.innerHTML=html;
+}
+function markNotifRead(id){
+  const all=DB.notifs(),n=all.find(x=>x.id===id);
+  if(!n)return;
+  n.read=true;
+  DB.saveN(all);checkDot();
+  renderNotifPanel();
+}
+function markAllRead(){
+  const all=DB.notifs();
+  all.filter(n=>n.forUser===CU.id).forEach(n=>n.read=true);
+  DB.saveN(all);checkDot();
+  renderNotifPanel();
 }
 
 // ── PROFILE PICTURE ──
@@ -1383,7 +1418,7 @@ function mkMSS(key,vals,lbls,ns='F'){
     <div class="ss-inp" onclick="toggleSS('${id}',event)" style="min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;${active?'background:var(--p);color:#fff;border-color:var(--p);':''}">${curLbl}</div>
     <div class="ss-drop" id="${id}_d" style="display:none;min-width:180px">
       <input class="ss-search" placeholder="🔍 Search…" oninput="filterSS('${id}',this.value)" onclick="event.stopPropagation()">
-      <div id="${id}_list">${items.map((v,i)=>`<div class="ss-opt${cur.includes(v)?' sel':''}" style="display:flex;align-items:center;gap:8px" onclick="pickMSS('${id}',${JSON.stringify(v)},event)"><span class="mss-ck" style="font-size:14px;flex-shrink:0">${cur.includes(v)?'☑':'☐'}</span><span>${ilbls[i]}</span></div>`).join('')}</div>
+      <div id="${id}_list">${items.map((v,i)=>`<div class="ss-opt${cur.includes(v)?' sel':''}" style="display:flex;align-items:center;gap:8px" data-mssid="${id}" data-val="${v.replace(/"/g,'&quot;')}" onclick="pickMSSEl(this,event)"><span class="mss-ck" style="font-size:14px;flex-shrink:0">${cur.includes(v)?'☑':'☐'}</span><span>${ilbls[i]}</span></div>`).join('')}</div>
       <div style="padding:6px 8px;border-top:1px solid var(--g100);display:flex;gap:6px" onclick="event.stopPropagation()">
         <button class="btn btn-o btn-sm" style="flex:1;font-size:11px" onclick="clearMSS('${id}')">Clear</button>
         <button class="btn btn-p btn-sm" style="flex:1;font-size:11px" onclick="document.getElementById('${id}_d').style.display='none';if(_mssChanged){_mssChanged=false;PAGE={};refreshView()}">Apply ✓</button>
@@ -1391,6 +1426,7 @@ function mkMSS(key,vals,lbls,ns='F'){
     </div>
   </div>`;
 }
+function pickMSSEl(el,e){pickMSS(el.dataset.mssid,el.dataset.val,e)}
 function pickMSS(id,val,e){
   e.stopPropagation();
   const d=_mssData[id]; if(!d) return;
