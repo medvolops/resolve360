@@ -278,11 +278,11 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 <div class="mo" id="m-raise"><div class="md">
   <div class="mh"><span class="mt">🚨 Raise Escalation</span><button class="mc2" onclick="closeM('m-raise')">✕</button></div>
   <div class="mb"><div class="fgrid">
-    <div class="fgroup full"><label>Assign To *</label><select id="r-assign" class="inp" style="width:100%"></select></div>
-    <div class="fgroup full"><label>Company *</label><select id="r-company" class="inp" style="width:100%"></select></div>
-    <div class="fgroup"><label>Category *</label><select id="r-category" class="inp" style="width:100%" onchange="onCatChange()"></select></div>
-    <div class="fgroup"><label>Sub-Category *</label><select id="r-subcategory" class="inp" style="width:100%"></select></div>
-    <div class="fgroup"><label>Priority *</label><select id="r-priority" class="inp" style="width:100%"><option value="">— Select —</option><option>Urgent</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+    <div class="fgroup full"><label>Assign To *</label><div id="ms-assign-slot"></div></div>
+    <div class="fgroup full"><label>Company *</label><div id="ms-company-slot"></div></div>
+    <div class="fgroup"><label>Category *</label><div id="ms-category-slot"></div></div>
+    <div class="fgroup"><label>Sub-Category *</label><div id="ms-subcat-slot"></div></div>
+    <div class="fgroup"><label>Priority *</label><div id="ms-priority-slot"></div></div>
     <div class="fgroup"><label>Due Date &amp; Time *</label><input type="datetime-local" id="r-due" class="inp" style="width:100%"></div>
     <div class="fgroup full"><label>Description / Remarks *</label><textarea id="r-desc" class="inp" style="width:100%;min-height:76px"></textarea></div>
   </div></div>
@@ -751,20 +751,27 @@ function escTable(list,showR=true,showA=true,pgKey=''){
 
 // ── RAISE MODAL ──
 function openRaiseModal(){
+  M={assign:'',company:'',cat:'',subcat:'',priority:'',due:new Date(Date.now()+86400000).toISOString().slice(0,16),desc:''};
   const users=DB.users().filter(u=>u.id!==CU.id);
-  document.getElementById('r-assign').innerHTML=`<option value="">— Select —</option>`+users.map(u=>`<option value="${u.id}">${u.nick||u.name} — ${uTeams(u).join(', ')}</option>`).join('');
-  document.getElementById('r-company').innerHTML=`<option value="">— Select —</option>`+DB.cos().map(c=>`<option value="${c}">${c}</option>`).join('');
-  const cats=DB.cats();
-  document.getElementById('r-category').innerHTML=`<option value="">— Select —</option>`+Object.keys(cats).map(c=>`<option value="${c}">${c}</option>`).join('');
-  document.getElementById('r-subcategory').innerHTML=`<option value="">— Select category first —</option>`;
-  ['r-desc','r-priority'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('r-due').value=new Date(Date.now()+86400000).toISOString().slice(0,16);
+  const cats=DB.cats(),catKeys=Object.keys(cats);
+  document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',['','...users.map(u=>u.id)],['— Select —',...users.map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)]);
+  document.getElementById('ms-company-slot').innerHTML=mkMS('company',['',...DB.cos()],['— Select —',...DB.cos()]);
+  document.getElementById('ms-category-slot').innerHTML=mkMS('cat',['',...catKeys],['— Select —',...catKeys],'onRCatPick');
+  document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',[''],['— Select category first —']);
+  document.getElementById('ms-priority-slot').innerHTML=mkMS('priority',['','Urgent','High','Medium','Low'],['— Select —','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low']);
+  document.getElementById('r-due').value=M.due;
+  document.getElementById('r-desc').value='';
   openM('m-raise');
 }
-function onCatChange(){const cat=document.getElementById('r-category').value,sub=document.getElementById('r-subcategory'),cats=DB.cats();sub.innerHTML=(!cat||!cats[cat])?`<option value="">— Select category first —</option>`:`<option value="">— Select —</option>`+cats[cat].map(s=>`<option value="${s}">${s}</option>`).join('')}
+function onRCatPick(cat){
+  M.subcat='';
+  const subs=DB.cats()[cat]||[];
+  document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',['',...subs],subs.length?['— Select —',...subs]:['— No subcategories —']);
+}
 function submitEsc(){
-  const v=id=>document.getElementById(id).value.trim();
-  const [aTo,co,cat,sub,pri,due,desc]=['r-assign','r-company','r-category','r-subcategory','r-priority','r-due','r-desc'].map(v);
+  const due=document.getElementById('r-due').value.trim();
+  const desc=document.getElementById('r-desc').value.trim();
+  const [aTo,co,cat,sub,pri]=[M.assign,M.company,M.cat,M.subcat,M.priority];
   if(!aTo||!co||!cat||!sub||!pri||!due||!desc){showToast('Fill all fields','⚠️');return}
   const es=DB.escs();
   const e={id:genId(),company:co,category:cat,subcategory:sub,priority:pri,desc,raisedBy:CU.id,assignedTo:aTo,passedThrough:[],status:'pending',due:new Date(due).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),remarks:'',activity:[{user:CU.id,text:`Raised → assigned to ${dN(aTo)}. Remarks: "${desc}"`,time:new Date().toISOString()}]};
@@ -1286,19 +1293,35 @@ function pager(list,key){
 }
 
 // ── SEARCHABLE SELECT ──
-function mkSS(key,vals,lbls,ns='F'){
+var _ssCb={};  // optional per-id pick callbacks
+function mkSS(key,vals,lbls,ns='F',cb=''){
   const id=`ss_${ns}_${key}`;const cur=window[ns]?.[key]||'';const curLbl=cur?lbls[vals.indexOf(cur)]||cur:lbls[0];
+  if(cb)_ssCb[id]=cb;
   return `<div class="ss-wrap" id="${id}_w">
-    <div class="ss-inp" onclick="toggleSS('${id}')" style="min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${curLbl}</div>
+    <div class="ss-inp" onclick="toggleSS('${id}',event)" style="min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer">${curLbl}</div>
     <div class="ss-drop" id="${id}_d" style="display:none">
-      <input class="ss-search" placeholder="Search…" oninput="filterSS('${id}',this.value)" onclick="event.stopPropagation()">
+      <input class="ss-search" placeholder="🔍 Search…" oninput="filterSS('${id}',this.value)" onclick="event.stopPropagation()">
       <div id="${id}_list">${vals.map((v,i)=>`<div class="ss-opt${v===cur?' sel':''}" onclick="pickSS('${id}','${ns}','${key}','${v.replace(/'/g,"\\'")}','${lbls[i].replace(/'/g,"\\'")}',event)">${lbls[i]}</div>`).join('')}</div>
     </div>
   </div>`;
 }
-function toggleSS(id){const d=document.getElementById(id+'_d');const open=d.style.display==='block';document.querySelectorAll('.ss-drop').forEach(x=>x.style.display='none');if(!open){d.style.display='block';d.querySelector('.ss-search')?.focus()}}
-function filterSS(id,q){const list=document.getElementById(id+'_list');list.querySelectorAll('.ss-opt').forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(q.toLowerCase())?'':'none'})}
-function pickSS(id,ns,key,val,lbl,e){e.stopPropagation();window[ns][key]=val;document.getElementById(id+'_w').querySelector('.ss-inp').textContent=lbl;document.getElementById(id+'_d').style.display='none';PAGE={};refreshView()}
+// Modal-specific searchable select (stores in window.M)
+var M={};
+function mkMS(key,vals,lbls,cb=''){
+  const id=`ms_${key}`;const cur=M[key]||'';const curLbl=cur?lbls[vals.indexOf(cur)]||cur:lbls[0];
+  if(cb)_ssCb[id]=cb;
+  return `<div class="ss-wrap" id="${id}_w" style="width:100%">
+    <div class="ss-inp" onclick="toggleSS('${id}',event)" style="width:100%;box-sizing:border-box;cursor:pointer">${curLbl}</div>
+    <div class="ss-drop" id="${id}_d" style="display:none;width:100%;left:0">
+      <input class="ss-search" placeholder="🔍 Search…" oninput="filterSS('${id}',this.value)" onclick="event.stopPropagation()">
+      <div id="${id}_list">${vals.map((v,i)=>`<div class="ss-opt${v===cur?' sel':''}" onclick="pickMS('${id}','${key}','${v.replace(/'/g,"\\'")}','${lbls[i].replace(/'/g,"\\'")}','${cb}',event)">${lbls[i]}</div>`).join('')}</div>
+    </div>
+  </div>`;
+}
+function pickMS(id,key,val,lbl,cb,e){e.stopPropagation();M[key]=val;document.getElementById(id+'_w').querySelector('.ss-inp').textContent=lbl||'— Select —';document.getElementById(id+'_d').style.display='none';if(cb&&window[cb])window[cb](val)}
+function toggleSS(id,e){if(e)e.stopPropagation();const d=document.getElementById(id+'_d');const open=d.style.display==='block';document.querySelectorAll('.ss-drop').forEach(x=>x.style.display='none');if(!open){d.style.display='block';d.querySelector('.ss-search')?.focus()}}
+function filterSS(id,q){const list=document.getElementById(id+'_list');if(list)list.querySelectorAll('.ss-opt').forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(q.toLowerCase())?'':'none'})}
+function pickSS(id,ns,key,val,lbl,e){e.stopPropagation();if(window[ns])window[ns][key]=val;document.getElementById(id+'_w').querySelector('.ss-inp').textContent=lbl;document.getElementById(id+'_d').style.display='none';const cb=_ssCb[id];if(cb&&window[cb])window[cb](val);else{PAGE={};refreshView()}}
 document.addEventListener('click',()=>document.querySelectorAll('.ss-drop').forEach(x=>x.style.display='none'));
 
 // ── MODAL HELPERS ──
