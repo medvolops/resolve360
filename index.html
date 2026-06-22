@@ -754,7 +754,7 @@ function openRaiseModal(){
   M={assign:'',company:'',cat:'',subcat:'',priority:'',due:new Date(Date.now()+86400000).toISOString().slice(0,16),desc:''};
   const users=DB.users().filter(u=>u.id!==CU.id);
   const cats=DB.cats(),catKeys=Object.keys(cats);
-  document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',['','...users.map(u=>u.id)],['— Select —',...users.map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)]);
+  document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',['',...users.map(u=>u.id)],['— Select —',...users.map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)]);
   document.getElementById('ms-company-slot').innerHTML=mkMS('company',['',...DB.cos()],['— Select —',...DB.cos()]);
   document.getElementById('ms-category-slot').innerHTML=mkMS('cat',['',...catKeys],['— Select —',...catKeys],'onRCatPick');
   document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',[''],['— Select category first —']);
@@ -807,8 +807,8 @@ function openDetail(id){
     if(e.status==='processing')btns.push(`<button class="btn btn-y btn-sm" onclick="showRmk('⏸ Put On Hold',r=>updateStatus('${id}','onhold',r))">⏸ Hold</button>`);
     if(e.status==='onhold')btns.push(`<button class="btn btn-p btn-sm" onclick="showRmk('▶ Resume',r=>updateStatus('${id}','processing',r))">▶ Resume</button>`);
     btns.push(`<button class="btn btn-g btn-sm" onclick="showRmk('✅ Close — Resolution',r=>resolveEsc('${id}',r),true)">✅ Close</button>`);
-    if(myAcc()===1)btns.push(`<button class="btn btn-y btn-sm" onclick="showRmk('🔺 Escalate to TL',r=>escalateEsc('${id}',r))">🔺 Escalate</button>`);
-    if(myAcc()===2)btns.push(`<button class="btn btn-r btn-sm" onclick="showRmk('🔺 Escalate to Manager',r=>escalateEsc('${id}',r))">🔺 Escalate</button>`);
+    if(myAcc()===1){const rto=CU.reportsTo?getU(CU.reportsTo):null;const lbl=rto&&rto.name!=='Unknown'?`🔺 Escalate to ${rto.nick||rto.name}`:'🔺 Escalate';btns.push(`<button class="btn btn-y btn-sm" onclick="showRmk('${lbl}',r=>escalateEsc('${id}',r))">${lbl}</button>`)}
+    if(myAcc()===2){const rto=CU.reportsTo?getU(CU.reportsTo):null;const lbl=rto&&rto.name!=='Unknown'?`🔺 Escalate to ${rto.nick||rto.name}`:'🔺 Escalate to Manager';btns.push(`<button class="btn btn-r btn-sm" onclick="showRmk('${lbl}',r=>escalateEsc('${id}',r))">${lbl}</button>`)}
     actionHtml=`<div style="margin-top:14px;border-top:1px solid var(--g100);padding-top:12px"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:9px">Actions</div><div id="act-btns" style="display:flex;gap:7px;flex-wrap:wrap">${btns.join('')}</div></div>`;
   }
 
@@ -884,9 +884,16 @@ function resolveEsc(id,rmk){
 }
 function escalateEsc(id,rmk){
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
-  const targetRoles=myAcc()===1?['account_manager','tl']:['manager','admin'];
-  const tgt=DB.users().find(u=>targetRoles.includes(u.role)&&uTeams(u).some(t=>uTeams(getU(e.assignedTo)).includes(t)))||DB.users().find(u=>targetRoles.includes(u.role));
-  if(!tgt){showToast('No target found','⚠️');return}
+  // Step 1: follow reportsTo chain — always most accurate
+  let tgt=CU.reportsTo?getU(CU.reportsTo):null;
+  if(tgt&&tgt.name==='Unknown')tgt=null;
+  // Step 2: fallback — find by role in CU's own team
+  if(!tgt){
+    const targetRoles=myAcc()===1?['tl','manager','senior_mgmt']:['manager','senior_mgmt'];
+    tgt=DB.users().find(u=>targetRoles.includes(u.role)&&uTeams(u).some(t=>uTeams(CU).includes(t)))
+      ||DB.users().find(u=>targetRoles.includes(u.role));
+  }
+  if(!tgt){showToast('No escalation target found','⚠️');return}
   const pt=e.passedThrough||[];if(!pt.includes(e.assignedTo))pt.push(e.assignedTo);
   e.assignedTo=tgt.id;e.passedThrough=pt;e.status='pending';e.updatedAt=new Date().toISOString();
   e.activity.push({user:CU.id,text:`Escalated → ${tgt.name}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
