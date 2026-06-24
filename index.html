@@ -51,6 +51,11 @@ a{cursor:pointer}
 .lmsg{background:var(--greenl);color:var(--green);padding:9px 13px;border-radius:var(--r);font-size:13px;margin-bottom:10px;display:none}
 #forgot-form{display:none}
 
+/* ORBITAL LOGIN ANIMATION */
+#orbital-anim{display:none;position:fixed;inset:0;background:#fff;z-index:9500;align-items:center;justify-content:center;flex-direction:column}
+#orbital-anim canvas{position:absolute;inset:0;width:100%;height:100%}
+@keyframes orbPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
 /* APP SHELL */
 #app{display:none;min-height:100vh;flex-direction:column}#app.v{display:flex}
 .topbar{background:#fff;border-bottom:1px solid var(--g200);height:54px;display:flex;align-items:center;padding:0 18px;gap:12px;position:sticky;top:0;z-index:200;box-shadow:var(--sh)}
@@ -96,13 +101,24 @@ a{cursor:pointer}
 .s-hdr-arrow{font-size:10px;color:var(--g500);transition:transform .2s}
 .s-hdr-arrow.open{transform:rotate(90deg)}
 .s-items{overflow:hidden;transition:max-height .22s ease}
-.ni{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sbt);margin-bottom:1px;cursor:pointer;transition:all .12s;white-space:nowrap;overflow:hidden;min-height:34px;box-sizing:border-box}
-.ni:hover{background:rgba(0,0,0,.05);color:var(--sbh)}
-.ni.active{background:var(--sba);color:var(--sbac);font-weight:600}
+.ni{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sbt);margin-bottom:1px;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1);white-space:nowrap;overflow:hidden;min-height:34px;box-sizing:border-box}
+.ni:hover{background:rgba(0,0,0,.06);color:var(--sbh);transform:translateX(3px);box-shadow:inset 3px 0 0 var(--p)}
+.ni.active{background:var(--sba);color:var(--sbac);font-weight:600;box-shadow:inset 3px 0 0 var(--p);transform:translateX(2px)}
 .ni .ico{font-size:15px;width:20px;text-align:center;flex-shrink:0}
 .ni .nb{margin-left:auto;background:rgba(239,68,68,.85);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:999px;min-width:16px;text-align:center;flex-shrink:0}
 .s-raise{background:var(--p);color:#fff;margin:8px 6px 4px;padding:9px 10px;border-radius:var(--r);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap;overflow:hidden}
 .s-raise:hover{background:var(--pd)}
+/* ── Section rail buttons ── */
+.sb-sec-row{margin:8px 0 2px}
+.sb-sec-btn{display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;color:var(--sbt);margin-bottom:2px;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1);white-space:nowrap;overflow:hidden;min-height:32px;box-sizing:border-box}
+.sb-sec-btn:hover{background:rgba(0,0,0,.05);transform:translateX(2px)}
+.sb-sec-btn.active{background:var(--p);color:#fff}
+.sb-sec-btn.active .nb{background:rgba(255,255,255,.25);color:#fff}
+.sb-sec-btn .ico{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.sb-sep{height:1px;background:rgba(0,0,0,.07);margin:6px 4px 10px}
+/* ── Badge bounce ── */
+@keyframes sbBounce{0%,100%{transform:scale(1)}40%{transform:scale(1.5)}70%{transform:scale(.88)}}
+.nb.bounce{animation:sbBounce .45s cubic-bezier(.4,0,.2,1)}
 
 /* MAIN — see layout above */
 .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
@@ -216,7 +232,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:16px}
 .tm{background:#fff;border-radius:var(--r);border:1px solid var(--g200);padding:14px;box-shadow:var(--sh);text-align:center}
 .tm .tname{font-size:13px;font-weight:700;margin-top:7px}.tm .trole{font-size:11px;color:var(--g400)}
-#toast{position:fixed;bottom:20px;right:20px;background:var(--g900);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:9999;display:none;align-items:center;gap:8px;max-width:300px;animation:su .2s ease}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--g900);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:9999;display:none;align-items:center;gap:8px;max-width:300px}
+#toast.show{display:flex!important;animation:su .2s ease}
 @keyframes su{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -243,6 +260,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
       <p style="text-align:center;margin-top:12px"><a onclick="showLogin()" style="font-size:13px;color:var(--p)">← Back</a></p>
     </div>
   </div>
+</div>
+
+<div id="orbital-anim">
+  <canvas id="orbital-cv"></canvas>
 </div>
 
 <div id="app-loading" style="display:none;position:fixed;inset:0;background:#fffdf5;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px">
@@ -364,7 +385,15 @@ const isFull=()=>myAcc()>=3;
 const isSenior=()=>myAcc()>=4;
 const uTeams=u=>Array.isArray(u?.teams)&&u.teams.length?u.teams:u?.team?[u.team]:[];
 function getSubtree(uid,all){all=all||DB.users();return[uid,...all.filter(u=>u.reportsTo===uid).flatMap(u=>getSubtree(u.id,all))];}
-function mySubtree(){if(isSenior())return DB.users().map(u=>u.id);if(isTeam())return getSubtree(CU.id);return DB.users().filter(u=>uTeams(u).some(t=>uTeams(CU).includes(t))).map(u=>u.id);}
+function mySubtree(){if(isSenior())return DB.users().map(u=>u.id);if(isTeam())return getSubtree(CU.id);return [CU.id];}
+// Scope filter for closed/disputed/followup tabs
+function inMyScope(e){
+  const uid=CU.id;
+  if(isSenior())return true;
+  if(isTeam()){const st=mySubtree();return st.includes(e.raisedBy)||st.includes(e.assignedTo);}
+  // Agent: only own records (raised by me or assigned to me, or passed through me)
+  return e.raisedBy===uid||e.assignedTo===uid||(e.passedThrough||[]).includes(uid);
+}
 
 // ── DEFAULT DATA ──
 const DEF_USERS=[
@@ -400,7 +429,7 @@ const DB={
   saveU:us=>{C.users=us;sb.from('users').upsert(us).then(r=>r.error&&console.error('saveU',r.error))},
   saveE:es=>{C.escs=es;sb.from('escalations').upsert(es).then(r=>r.error&&console.error('saveE',r.error))},
   saveN:ns=>{C.notifs=ns;sb.from('notifications').upsert(ns).then(r=>r.error&&console.error('saveN',r.error))},
-  saveC:cs=>{C.cos=cs;sb.from('companies').delete().neq('name','').then(()=>cs.length&&sb.from('companies').insert(cs.map(n=>({name:n}))))},
+  saveC:cs=>{C.cos=cs;sb.from('companies').select('name').then(({data})=>{const old=(data||[]).map(r=>r.name);const toAdd=cs.filter(n=>!old.includes(n));const toDel=old.filter(n=>!cs.includes(n));if(toAdd.length)sb.from('companies').insert(toAdd.map(n=>({name:n}))).then(r=>r.error&&console.error('saveC insert',r.error));if(toDel.length)sb.from('companies').delete().in('name',toDel).then(r=>r.error&&console.error('saveC delete',r.error));})},
   saveK:cats=>{C.cats=cats;sb.from('categories').upsert(Object.entries(cats).map(([name,subcategories])=>({name,subcategories}))).then(r=>r.error&&console.error('saveK',r.error))},
   saveAv:a=>localStorage.setItem('et_av',JSON.stringify(a)),
   sess:()=>{try{return JSON.parse(localStorage.getItem('et_s'))}catch{return null}},
@@ -426,16 +455,17 @@ async function seedIfEmpty(){
   if(!C.users.length){await sb.from('users').insert(DEF_USERS);seeded=true}
   if(!C.cos.length){await sb.from('companies').insert(DEF_COS.map(n=>({name:n})))}
   if(!Object.keys(C.cats).length){await sb.from('categories').insert(Object.entries(DEF_CATS).map(([name,subs])=>({name,subcategories:subs})))}
-  if(seeded)await loadCache(); // reload so cache matches Supabase format exactly
+  if(seeded)await loadCache();
 }
 
+let _rtChannel=null;
 function startRealtime(){
-  sb.channel('live')
+  if(_rtChannel){sb.removeChannel(_rtChannel);_rtChannel=null;}
+  _rtChannel=sb.channel('live')
     .on('postgres_changes',{event:'*',schema:'public',table:'escalations'},async({new:rec,eventType})=>{
       const prev=C.escs.find(e=>e.id===rec?.id);
       const{data}=await sb.from('escalations').select('*').order('createdAt',{ascending:false});
       C.escs=data||[];refreshView();buildSidebar();
-      // Desktop notification: new assignment or reassignment to me
       if(CU&&rec&&rec.assignedTo===CU.id){
         const isNew=eventType==='INSERT'||(!prev||prev.assignedTo!==CU.id);
         if(isNew)deskNotif(`📋 New escalation assigned`,`${rec.id} — ${rec.company||''}`,rec.id);
@@ -444,12 +474,12 @@ function startRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications'},async({new:rec})=>{
       const{data}=await sb.from('notifications').select('*').order('time',{ascending:false});
       C.notifs=data||[];buildSidebar();checkDot();
-      // Desktop notification for in-app notification
       if(CU&&rec&&rec.forUser===CU.id)deskNotif('🔔 Resolve360',rec.text||'You have a new notification',rec.escId);
     })
     .subscribe();
 }
 
+function doLogout(){if(_rtChannel){sb.removeChannel(_rtChannel);_rtChannel=null;}DB.clrSess();CU=null;document.getElementById('login').style.display='flex';document.getElementById('app').classList.remove('v');showLogin()}
 const bcast=()=>{};
 
 // ── USER CODE AUTO-GENERATION ──
@@ -516,7 +546,6 @@ var F={},DF={},RF={};
 
 // ── PAGINATION ──
 const PER=15;
-function pager(list,key){const p=PAGE[key]||1,tot=Math.ceil(list.length/PER)||1,items=list.slice((p-1)*PER,p*PER);const html=tot>1?`<div class="pgr">${p>1?`<button class="btn btn-o btn-sm" onclick="setPage('${key}',${p-1})">← Prev</button>`:'<span></span>'}<span style="font-size:12px;color:var(--g500);margin:0 auto">Page ${p}/${tot} · ${list.length} items</span>${p<tot?`<button class="btn btn-o btn-sm" onclick="setPage('${key}',${p+1})">Next →</button>`:'<span></span>'}</div>`:'';return{items,html}}
 function setPage(k,p){PAGE[k]=p;refreshView()}
 
 // ── FILTER BAR ──
@@ -588,10 +617,164 @@ async function doLogin(){
     await ensureUserCodes();
     const u=C.users.find(x=>x.mobile===m&&x.pass===p);
     if(!u){showErr('Invalid credentials.');return}
-    DB.setSess(u.id);startSess(u);
+    DB.setSess(u.id);startSess(u,true);
   }catch(e){console.error(e);showErr('Connection error. Check your internet and try again.');}
 }
-function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm();loadDuty().then(()=>checkLeaveExpiry());}
+function startSess(u,animate=false){
+  CU=u;
+  document.getElementById('login').style.display='none';
+  const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');
+  renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm();loadDuty().then(()=>checkLeaveExpiry());
+  if(animate)showOrbitalAnim(u);
+}
+
+function showOrbitalAnim(u){
+  const overlay=document.getElementById('orbital-anim');
+  const cv=document.getElementById('orbital-cv');
+  overlay.style.display='flex';overlay.style.opacity='1';
+
+  const escs=C.escs||[];const users=C.users||[];
+  const today=localDate();
+  const openCount=escs.filter(e=>e.status!=='closed').length;
+  const critCount=escs.filter(e=>e.status!=='closed'&&e.priority==='critical').length;
+  const onlineCount=users.filter(x=>x.id!==u.id&&['agent','senior_agent','account_manager'].includes(x.role)).length;
+  const todayCount=escs.filter(e=>e.createdAt&&e.createdAt.startsWith(today)).length;
+  const myOpen=escs.filter(e=>e.status!=='closed'&&(e.assignedTo===u.id||e.raisedBy===u.id)).length;
+
+  const W=window.innerWidth,H=window.innerHeight;
+  cv.width=W;cv.height=H;
+  const CX=W/2,CY=H/2;
+  const ctx=cv.getContext('2d');
+
+  const initials=(u.nick||u.name||'U').replace(/[^a-zA-Z ]/g,'').trim().split(/\s+/).map(x=>x[0]||'').join('').toUpperCase().slice(0,2)||'R';
+  const displayName=u.nick||u.name||'User';
+
+  const orbs=[
+    {label:String(openCount), sub:'Open',      angle:0,   speed:.025, r:100, color:'#6366f1', size:28},
+    {label:String(critCount), sub:'Critical',  angle:2.1, speed:.02,  r:138, color:'#ef4444', size:23},
+    {label:String(onlineCount),sub:'Agents',   angle:4.2, speed:.032, r:75,  color:'#10b981', size:22},
+    {label:String(todayCount), sub:'Today',    angle:1.0, speed:.024, r:118, color:'#f59e0b', size:20},
+    {label:String(myOpen),     sub:'Mine',     angle:3.3, speed:.017, r:155, color:'#8b5cf6', size:18},
+  ];
+
+  const ORBIT_FRAMES=85;  // ~1.4s orbit
+  const SNAP_FRAMES=50;   // ~0.8s snap
+  const HOLD_FRAMES=18;   // brief hold before fade
+  const TOTAL=ORBIT_FRAMES+SNAP_FRAMES+HOLD_FRAMES;
+
+  let frame=0,phase='orbit',rafId=null;
+  orbs.forEach(o=>{o.cx=CX+Math.cos(o.angle)*o.r;o.cy=CY+Math.sin(o.angle)*o.r;});
+
+  // snap destinations: centered row above center
+  const snapY=CY-30;
+  const snapStep=Math.min(110,(W-80)/5);
+  const snapStartX=CX-(2*snapStep);
+
+  function drawOrb(o){
+    const pulse=phase==='orbit'?(1+.07*Math.sin(frame*.13+o.angle)):1;
+    const sz=o.size*pulse;
+    ctx.beginPath();ctx.arc(o.cx,o.cy,sz*1.55,0,Math.PI*2);
+    ctx.fillStyle=o.color+'1a';ctx.fill();
+    ctx.beginPath();ctx.arc(o.cx,o.cy,sz,0,Math.PI*2);
+    ctx.fillStyle=o.color+'33';ctx.fill();
+    ctx.beginPath();ctx.arc(o.cx,o.cy,sz*.65,0,Math.PI*2);
+    ctx.fillStyle=o.color;ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font=`600 ${Math.max(9,Math.round(sz*.58))}px 'Plus Jakarta Sans',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(o.label,o.cx,o.cy);
+    if(sz>14){
+      ctx.fillStyle='rgba(0,0,0,.32)';
+      ctx.font=`${Math.max(8,Math.round(sz*.32))}px 'Plus Jakarta Sans',sans-serif`;
+      ctx.fillText(o.sub,o.cx,o.cy+sz*.85);
+    }
+  }
+
+  function loop(){
+    ctx.clearRect(0,0,W,H);
+    frame++;
+
+    if(frame===ORBIT_FRAMES){
+      phase='snap';
+      orbs.forEach((o,i)=>{o.snapAngle=o.angle;o.snapFromX=o.cx;o.snapFromY=o.cy;o.snapX=snapStartX+i*snapStep;o.snapY=snapY;});
+    }
+    if(frame===ORBIT_FRAMES+SNAP_FRAMES) phase='hold';
+    if(frame>=TOTAL){
+      cancelAnimationFrame(rafId);
+      overlay.style.transition='opacity .5s ease';
+      overlay.style.opacity='0';
+      setTimeout(()=>{overlay.style.display='none';overlay.style.opacity='1';overlay.style.transition='';},520);
+      return;
+    }
+
+    // orbit rings (only during orbit phase)
+    if(phase==='orbit'){
+      orbs.forEach(o=>{
+        ctx.beginPath();ctx.arc(CX,CY,o.r,0,Math.PI*2);
+        ctx.strokeStyle='rgba(99,102,241,.06)';ctx.lineWidth=.7;ctx.stroke();
+        ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(o.cx,o.cy);
+        ctx.strokeStyle='rgba(99,102,241,.08)';ctx.lineWidth=.5;ctx.stroke();
+      });
+    }
+
+    // center avatar
+    ctx.save();
+    [36,24,14].forEach((r,i)=>{
+      ctx.beginPath();ctx.arc(CX,CY,r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(99,102,241,${[.1,.2,.9][i]})`;ctx.fill();
+    });
+    ctx.fillStyle='#fff';
+    ctx.font=`700 ${initials.length>1?11:13}px 'Plus Jakarta Sans',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(initials,CX,CY);
+    ctx.restore();
+
+    // name label below avatar (only orbit+hold)
+    if(phase!=='snap'||(frame-ORBIT_FRAMES)<20){
+      const labelAlpha=phase==='hold'?1:Math.min(1,(frame-ORBIT_FRAMES+20)/20);
+      ctx.globalAlpha=phase==='orbit'?1:labelAlpha;
+      ctx.fillStyle='#1e293b';
+      ctx.font=`600 15px 'Plus Jakarta Sans',sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(displayName,CX,CY+54);
+      ctx.fillStyle='#94a3b8';
+      ctx.font=`400 12px 'Plus Jakarta Sans',sans-serif`;
+      ctx.fillText('Loading your dashboard…',CX,CY+72);
+      ctx.globalAlpha=1;
+    }
+
+    // update & draw orbs
+    orbs.forEach(o=>{
+      if(phase==='orbit'){
+        o.angle+=o.speed;
+        o.cx=CX+Math.cos(o.angle)*o.r;
+        o.cy=CY+Math.sin(o.angle)*o.r;
+      } else if(phase==='snap'){
+        const prog=Math.min((frame-ORBIT_FRAMES)/SNAP_FRAMES,1);
+        const ease=1-Math.pow(1-prog,3);
+        o.cx=o.snapFromX+(o.snapX-o.snapFromX)*ease;
+        o.cy=o.snapFromY+(o.snapY-o.snapFromY)*ease;
+      }
+      drawOrb(o);
+    });
+
+    // snap phase: draw stat labels below each snapped orb
+    if(phase==='snap'||phase==='hold'){
+      const prog=Math.min((frame-ORBIT_FRAMES)/30,1);
+      ctx.globalAlpha=prog;
+      orbs.forEach(o=>{
+        ctx.fillStyle='#334155';
+        ctx.font=`500 11px 'Plus Jakarta Sans',sans-serif`;
+        ctx.textAlign='center';ctx.textBaseline='top';
+        ctx.fillText(o.sub,o.snapX,o.snapY+o.size*1.8+6);
+      });
+      ctx.globalAlpha=1;
+    }
+
+    rafId=requestAnimationFrame(loop);
+  }
+  rafId=requestAnimationFrame(loop);
+}
 async function checkLeaveExpiry(){
   const today=localDate();
   const expired=DB.users().filter(u=>u.onLeave&&u.leaveUntil&&u.leaveUntil<=today);
@@ -606,7 +789,6 @@ async function checkLeaveExpiry(){
 function requestNotifPerm(){if(!('Notification' in window))return;if(Notification.permission==='default'){setTimeout(()=>Notification.requestPermission(),2000)}}
 function deskNotif(title,body,escId){if(Notification.permission!=='granted')return;const n=new Notification(title,{body,icon:'https://surya-medvol.github.io/resolve360/favicon.ico',tag:escId||'resolve360'});n.onclick=()=>{window.focus();if(escId)openDetail(escId);n.close()}}
 function renderTopbar(){document.getElementById('t-av').innerHTML=av(CU.id,32);document.getElementById('t-name').textContent=CU.nick||CU.name}
-function doLogout(){DB.clrSess();CU=null;document.getElementById('login').style.display='flex';document.getElementById('app').classList.remove('v');showLogin()}
 function showAppLoading(msg){const el=document.getElementById('app-loading');el.style.display='flex';document.getElementById('app-loading-msg').textContent=msg||'Loading…';document.getElementById('login').style.display='none';document.getElementById('app').style.display='none'}
 function hideAppLoading(){document.getElementById('app-loading').style.display='none'}
 window.addEventListener('load',async()=>{
@@ -633,7 +815,10 @@ async function handleForgot(){if(!fVer){const m=document.getElementById('f-mobil
 function showErr(m){const e=document.getElementById('lerr');e.textContent=m;e.style.display='block';setTimeout(()=>e.style.display='none',4000)}
 function showMsg(m){const e=document.getElementById('lmsg');e.textContent=m;e.style.display='block'}
 
-// ── SIDEBAR (Outlook-style collapsible) ──
+// ── SIDEBAR ──
+var _sbSec='work'; // active section icon
+var _sbCounts={}; // previous counts for bounce detection
+function showSbSec(sec){_sbSec=sec;buildSidebar();}
 // ── SIDEBAR PIN STATE ──
 let sbPinned=localStorage.getItem('et_sbp')!=='0'; // default: pinned open; collapses only if user explicitly hid it
 function applySbMode(){
@@ -651,7 +836,8 @@ function toggleSbPin(){
 }
 
 function buildSidebar(){
-  if(!CU)return;const es=DB.escs(),uid=CU.id;
+  if(!CU)return;
+  const es=DB.escs(),uid=CU.id;
   const cnt=f=>es.filter(f).length;
   const pendMe=cnt(e=>e.assignedTo===uid&&e.status==='pending');
   const procMe=cnt(e=>e.assignedTo===uid&&e.status==='processing');
@@ -659,34 +845,69 @@ function buildSidebar(){
   const passMe=cnt(e=>(e.passedThrough||[]).includes(uid)&&e.status!=='closed');
   const rOpen=cnt(e=>e.raisedBy===uid&&e.status!=='closed');
   const allOpen=cnt(e=>e.status!=='closed');
-  const fuCnt=cnt(e=>e.followUp&&['pending','processing','onhold','disputed'].includes(e.status)&&(e.raisedBy===uid||mySubtree().includes(e.assignedTo)));
-  const dispCnt=cnt(e=>e.status==='disputed');
+  const fuCnt=cnt(e=>e.followUp&&['pending','processing','onhold','disputed'].includes(e.status)&&inMyScope(e));
+  const dispCnt=cnt(e=>e.status==='disputed'&&inMyScope(e));
   const st=mySubtree();
   const tActive=cnt(e=>['pending','processing','onhold'].includes(e.status)&&st.includes(e.assignedTo));
   const tRaised=cnt(e=>e.status!=='closed'&&st.includes(e.raisedBy));
-  const pinIco=sbPinned?'◀':'▶';const pinTip=sbPinned?'Collapse sidebar':'Pin sidebar open';
-  let h=`<div class="sb-toggle" title="${pinTip}" onclick="toggleSbPin()"><div class="sb-toggle-btn">${pinIco}</div></div>`;
+  const lrCnt=isTeam()?cnt(e=>e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW'))&&e.status!=='closed'&&inMyScope(e)):0;
+
+  // Auto-select section based on current page
+  const p2s={dashboard:'work',todo:'work','pending-me':'work','processing-me':'work','onhold-me':'work','passed-me':'work','raised-open':'work','raised-all':'work',search:'work','team-active':'team','team-raised':'team','team-dashboard':'team','team-pending':'team',reports:'team','mgr-overview':'mgr','mgr-agents':'mgr',admin:'mgr',followup:'flags',disputed:'flags','leave-review':'flags',closed:'flags',duty:'roster'};
+  if(p2s[CP])_sbSec=p2s[CP];
+
+  // Build pin toggle + raise button
+  const pinIco=sbPinned?'◀':'▶';
+  let h=`<div class="sb-toggle" title="${sbPinned?'Collapse':'Pin open'}" onclick="toggleSbPin()"><div class="sb-toggle-btn">${pinIco}</div></div>`;
   h+=`<div class="s-raise" onclick="openRaiseModal()"><span style="flex-shrink:0">🚨</span><span class="s-raise-txt">Raise Escalation</span></div>`;
-  h+=ni2('dashboard','📊','Dashboard');
-  h+=`<div class="ni ${CP==='todo'?'active':''}" onclick="goTodo()"><span class="ico">📝</span><span class="ni-txt">My To-Do</span></div>`;
-  h+=sec('queue','My Queue',[
-    ni2r('pending-me','⏳','Pending With Me',pendMe),
-    ni2r('processing-me','🔄','I Am Processing',procMe),
-    ni2r('onhold-me','⏸','On Hold By Me',holdMe),
-    ni2r('passed-me','↩️','Passed Through Me',passMe),
-  ]);
-  h+=sec('raised','Raised By Me',[
-    ni2r('raised-open','📋','Open Requests',rOpen),
-    ni2('raised-all','📁','All Raised'),
-  ]);
-  h+=sec('myteam','My Team',[ni2r('team-active','🔥','Team Active',tActive),ni2r('team-raised','📤','Team Raised',tRaised)]);
-  if(isTeam())h+=sec('team','Team View',[ni2r('team-dashboard','👥','Team Overview',allOpen),ni2('team-pending','📌','Team Pending'),ni2('reports','📈','Reports & Analytics')]);
-  if(isFull())h+=sec('mgr',isSenior()?'Senior Mgmt':'Manager',[ni2r('mgr-overview','🏢','All Teams',allOpen),ni2('mgr-agents','👤','Agent-wise'),ni2('admin','⚙️','Admin Panel')]);
-  const lrCnt=isTeam()?cnt(e=>e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW'))&&e.status!=='closed'):0;
-  h+=sec('flags','Flags & Disputes',[ni2r('followup','🚩','Follow-up',fuCnt||''),ni2r('disputed','⚠️','Disputed',dispCnt||''),...(lrCnt?[ni2r('leave-review','🏖','Leave Review',lrCnt)]:[] )]);
-  if(isTeam())h+=sec('rota','Duty Roster',[ni2('duty','🗓','Today\'s Roster')]);
-  h+=sec('arch','Archive',[ni2('closed','✅','Closed')]);
+
+  // Section icon rail
+  const workN=pendMe+rOpen;
+  const teamN=tActive;
+  const flagN=(fuCnt||0)+(dispCnt||0)+(lrCnt||0);
+  const secs=[
+    {k:'work', ico:'📋', lbl:'My Work',  n:workN},
+    {k:'team', ico:'👥', lbl:'Team',     n:teamN},
+    {k:'flags',ico:'🚩', lbl:'Flags',    n:flagN},
+    ...(isTeam()?[{k:'roster',ico:'🗓',lbl:'Roster',n:0}]:[]),
+    ...(isFull()?[{k:'mgr',  ico:'⚙️', lbl:'Manage', n:allOpen}]:[]),
+  ];
+  h+=`<div class="sb-sec-row">`;
+  secs.forEach(s=>{
+    h+=`<div class="sb-sec-btn${_sbSec===s.k?' active':''}" onclick="showSbSec('${s.k}')" title="${s.lbl}"><span class="ico">${s.ico}</span><span class="ni-txt">${s.lbl}</span>${s.n?`<span class="nb">${s.n}</span>`:''}</div>`;
+  });
+  h+=`</div><div class="sb-sep"></div>`;
+
+  // Panel: items for active section only
+  if(_sbSec==='work'){
+    h+=ni2('dashboard','📊','Dashboard');
+    h+=`<div class="ni${CP==='todo'?' active':''}" onclick="goTodo()"><span class="ico">📝</span><span class="ni-txt">My To-Do</span></div>`;
+    h+=sec('queue','My Queue',[ni2r('pending-me','⏳','Pending With Me',pendMe),ni2r('processing-me','🔄','I Am Processing',procMe),ni2r('onhold-me','⏸','On Hold By Me',holdMe),ni2r('passed-me','↩️','Passed Through Me',passMe)]);
+    h+=sec('raised','Raised By Me',[ni2r('raised-open','📋','Open Requests',rOpen),ni2('raised-all','📁','All My Raised')]);
+  } else if(_sbSec==='team'){
+    h+=sec('myteam','My Team',[ni2r('team-active','🔥','Team Active',tActive),ni2r('team-raised','📤','Team Raised',tRaised)]);
+    if(isTeam())h+=sec('teamv','Team View',[ni2r('team-dashboard','👥','Team Overview',allOpen),ni2('team-pending','📌','Team Pending'),ni2('reports','📈','Reports & Analytics')]);
+  } else if(_sbSec==='flags'){
+    h+=sec('flags','Flags & Disputes',[ni2r('followup','🚩','Follow-up',fuCnt||''),ni2r('disputed','⚠️','Disputed',dispCnt||''),...(lrCnt?[ni2r('leave-review','🏖','Leave Review',lrCnt)]:[] )]);
+    h+=sec('arch','Archive',[ni2('closed','✅','Closed')]);
+  } else if(_sbSec==='roster'){
+    h+=sec('rota','Duty Roster',[ni2('duty','🗓','Today\'s Roster')]);
+  } else if(_sbSec==='mgr'){
+    h+=sec('mgr',isSenior()?'Senior Mgmt':'Manager',[ni2r('mgr-overview','🏢','All Teams',allOpen),ni2('mgr-agents','👤','Agent-wise'),ni2('admin','⚙️','Admin Panel')]);
+  }
+
   document.getElementById('sidebar').innerHTML=h;
+
+  // Badge bounce: animate any badge whose count increased since last render
+  const newC={pendMe,procMe,holdMe,passMe,rOpen,allOpen,fuCnt,dispCnt,lrCnt,tActive,tRaised};
+  Object.entries(newC).forEach(([k,v])=>{
+    if(v>0&&_sbCounts[k]!==undefined&&v>_sbCounts[k]){
+      document.querySelectorAll('.nb').forEach(el=>{
+        if(+el.textContent===v){el.classList.remove('bounce');void el.offsetWidth;el.classList.add('bounce');setTimeout(()=>el.classList.remove('bounce'),500);}
+      });
+    }
+  });
+  _sbCounts=newC;
   applySbMode();
 }
 function sec(key,label,items){
@@ -695,20 +916,6 @@ function sec(key,label,items){
 }
 function ni2(page,icon,label){const a=CP===page?'active':'';return `<div class="ni ${a}" onclick="navigate('${page}')"><span class="ico">${icon}</span><span class="ni-txt">${label||''}</span></div>`}
 function ni2r(page,icon,label,badge){const a=CP===page?'active':'';return `<div class="ni ${a}" onclick="navigate('${page}')"><span class="ico">${icon}</span><span class="ni-txt">${label}</span>${badge?`<span class="nb">${badge}</span>`:''}</div>`}
-function toggleSec(key){
-  sC[key]=!sC[key];
-  const el=document.getElementById('sec_'+key),arr=document.getElementById('arr_'+key);
-  if(el){el.style.maxHeight=sC[key]?'500px':'0';el.style.overflow='hidden';}
-  if(arr)arr.classList.toggle('open',sC[key]);
-}
-
-// ── ROUTER ──
-function navigate(page){if(page!==CP){F={};PAGE={};}CP=page;buildSidebar();
-  const r={dashboard:renderDashboard,'pending-me':()=>renderList('pending-me'),'processing-me':()=>renderList('processing-me'),'onhold-me':()=>renderList('onhold-me'),'passed-me':()=>renderList('passed-me'),'raised-open':()=>renderList('raised-open'),'raised-all':()=>renderList('raised-all'),'team-active':()=>renderList('team-active'),'team-raised':()=>renderList('team-raised'),'team-dashboard':renderTeamDash,'team-pending':()=>renderList('team-pending'),'mgr-overview':renderMgrOverview,'mgr-agents':renderMgrAgents,reports:renderReports,admin:renderAdmin,closed:()=>renderList('closed')};
-  document.getElementById('main').innerHTML=(r[page]||renderDashboard)();
-  if(page==='reports')setTimeout(initCharts,80);
-}
-let _rvT;function refreshView(){if(CU){clearTimeout(_rvT);_rvT=setTimeout(()=>navigate(CP),60)}}
 function searchEsc(v){const e=DB.escs().find(x=>x.id===v.trim().toUpperCase());e?openDetail(e.id):showToast('ESC ID not found','⚠️')}
 
 // ── DASHBOARD ──
@@ -743,11 +950,11 @@ function renderList(page){
     'raised-all':{title:'📁 All My Raised',filter:e=>e.raisedBy===uid,r:true},
     'team-active':{title:'🔥 Team Active',filter:e=>['pending','processing','onhold'].includes(e.status)&&st.includes(e.assignedTo),r:true,a:true},
     'team-raised':{title:'📤 Team Raised',filter:e=>e.status!=='closed'&&st.includes(e.raisedBy),r:true,a:true},
-    'team-pending':{title:'📌 Team Pending',filter:e=>st.includes(e.assignedTo)&&e.status!=='closed',r:true,a:true},
-    'closed':{title:'✅ Closed',filter:e=>e.status==='closed'},
-    'disputed':{title:'⚠️ Disputed',filter:e=>e.status==='disputed',r:true,a:true},
-    'followup':{title:'🚩 Follow-up Flagged',filter:e=>e.followUp&&e.status!=='closed',r:true,a:true},
-    'leave-review':{title:'🏖 Leave Review',filter:e=>e.status!=='closed'&&e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW')),r:true,a:true},
+    'team-pending':{title:'📌 Team Pending',filter:e=>st.includes(e.assignedTo)&&!['closed','disputed'].includes(e.status),r:true,a:true},
+    'closed':{title:'✅ Closed',filter:e=>e.status==='closed'&&inMyScope(e)},
+    'disputed':{title:'⚠️ Disputed',filter:e=>e.status==='disputed'&&e.status!=='closed'&&inMyScope(e),r:true,a:true},
+    'followup':{title:'🚩 Follow-up Flagged',filter:e=>e.followUp&&e.status!=='closed'&&inMyScope(e),r:true,a:true},
+    'leave-review':{title:'🏖 Leave Review',filter:e=>e.status!=='closed'&&e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW'))&&inMyScope(e),r:true,a:true},
   };
   const c=cfg[page]||cfg['raised-all'];const raw=es.filter(c.filter);const list=applyF(raw);
   const dateBar=page==='closed'?`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--g500)">📅 Closed date:</span><input type="date" class="ss-inp" style="width:140px" value="${F.from||''}" onchange="F.from=this.value;refreshView()"><span style="font-size:12px;color:var(--g400)">to</span><input type="date" class="ss-inp" style="width:140px" value="${F.to||''}" onchange="F.to=this.value;refreshView()"></div>`:'';
@@ -763,6 +970,7 @@ function renderTeamDash(){
   h+=`<div class="sdiv">All Open (${list.length}/${raw.length})</div>`+fBar()+escTable(list,true,true,'team-dashboard');return h;
 }
 function renderMgrOverview(){
+  if(!isFull())return`<div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Access restricted.</div></div></div>`;
   const es=DB.escs(),teams=[...new Set(DB.users().flatMap(u=>uTeams(u)))];
   let h=`<div class="ph"><div><div class="ptitle">🏢 All Teams Overview</div></div></div>
   <div class="stats" style="grid-template-columns:repeat(4,1fr)">${sc('Total Open','📋',es.filter(e=>e.status!=='closed').length,'red','Active','mgr-overview')}${sc('Pending','⏳',es.filter(e=>e.status==='pending').length,'amber','','mgr-overview')}${sc('Processing','🔄',es.filter(e=>e.status==='processing').length,'blue','','mgr-overview')}${sc('On Hold','⏸',es.filter(e=>e.status==='onhold').length,'violet','','mgr-overview')}</div>`;
@@ -785,6 +993,7 @@ function renderMgrOverview(){
   return h;
 }
 function renderMgrAgents(){
+  if(!isFull())return`<div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Access restricted.</div></div></div>`;
   const es=DB.escs(),agents=DB.users().filter(u=>RA[u.role]<3);
   let h=`<div class="ph"><div><div class="ptitle">👤 Agent-wise Tracking</div></div></div><div class="team-grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">`;
   agents.forEach(u=>{const asgn=es.filter(e=>e.assignedTo===u.id),cl=asgn.filter(e=>e.status==='closed');const [p,pr,ho]=[['pending'],['processing'],['onhold']].map(([s])=>asgn.filter(e=>e.status===s).length);
@@ -797,7 +1006,7 @@ function escTable(list,showR=true,showA=true,pgKey=''){
   if(!list.length)return `<div class="card"><div class="empty"><div class="ei">📭</div><div class="em">No escalations here.</div></div></div>`;
   let rows=list,pHtml='';if(pgKey){const {items,html}=pager(list,pgKey);rows=items;pHtml=html}
   return `<div class="card"><div class="tw"><table><thead><tr><th>ID</th><th>Company</th><th>Category</th>${showR?'<th>Raised By</th>':''}${showA?'<th>Assigned To</th>':''}<th>Priority</th><th>Status</th><th>Due</th><th>Age</th><th></th></tr></thead><tbody>${rows.map(e=>`<tr>
-    <td><span class="idc" onclick="openDetail('${e.id}')">${e.id}</span>${e.followUp?' <span title="Follow-up flagged">🚩</span>':''}</td>
+    <td><span class="idc" onclick="openDetail('${e.id}')">${e.id}</span>${e.followUp?' <span title="Follow-up flagged">🚩</span>':''}${e.everDisputed?' <span title="Previously disputed" style="font-size:10px;background:#fef9c3;color:#92400e;border:1px solid #fbbf24;border-radius:3px;padding:1px 4px;font-weight:700">⚠️ D</span>':''}</td>
     <td><div style="font-weight:600;font-size:13px">${e.company||'—'}</div></td>
     <td><div style="font-size:12px;font-weight:600">${e.category||'—'}</div><div style="font-size:11px;color:var(--g400);margin-top:2px">${e.subcategory||''}</div></td>
     ${showR?`<td style="white-space:nowrap">${av(e.raisedBy,20)}<span style="font-size:12px;margin-left:5px">${dN(e.raisedBy)}</span></td>`:''}
@@ -817,7 +1026,9 @@ function openRaiseModal(){
   const rrVals=[],rrLbls=[];
   const allTeams=[...new Set(DB.users().flatMap(u=>uTeams(u)))];
   allTeams.forEach(t=>{if(DUTY[t]?.rr&&DUTY[t].users.length){rrVals.push('rr:'+t);rrLbls.push(`🔄 ${t} (Round Robin)`)}});
-  const indivUsers=DB.users().filter(u=>u.id!==CU.id);
+  // Exclude agents who are enrolled in an active RR team — they must be assigned via round-robin
+  const rrEnrolled=new Set(allTeams.filter(t=>DUTY[t]?.rr&&DUTY[t].users.length).flatMap(t=>DUTY[t].users));
+  const indivUsers=DB.users().filter(u=>u.id!==CU.id&&!rrEnrolled.has(u.id));
   const assignVals=['',...rrVals,...indivUsers.map(u=>u.id)];
   const assignLbls=['— Select —',...rrLbls,...indivUsers.map(u=>`${u.nick||u.name}${u.onLeave?' 🏖 (On Leave)':''} — ${uTeams(u).join(', ')}`)];
   const assignStyles=['',...rrVals.map(()=>''),...indivUsers.map(u=>u.onLeave?'color:var(--g400);background:var(--g50)':'')];
@@ -828,10 +1039,6 @@ function openRaiseModal(){
   document.getElementById('ms-priority-slot').innerHTML=mkMS('priority',['','Urgent','High','Medium','Low'],['— Select —','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'],'onRPriPick');
   const nowMin=localISO(new Date(Date.now()-60000)); // 1-min grace
   const dueEl=document.getElementById('r-due');dueEl.value=M.due;dueEl.min=nowMin;
-  // Team auto-assign section (round-robin)
-  const teams=[...new Set(DB.users().flatMap(u=>uTeams(u)))].filter(t=>DUTY[t]?.users?.length);
-  const taSlot=document.getElementById('r-team-slot');
-  if(taSlot)taSlot.innerHTML=teams.length?`<select class="inp" style="width:100%" onchange="autoAssignTeam(this.value)"><option value="">— Manual assignment —</option>${teams.map(t=>`<option value="${t}">${t} (${DUTY[t].users.length} on duty)</option>`).join('')}</select>`:`<div style="font-size:12px;color:var(--g400);padding:6px 0">No duty roster set — TL must set up roster first</div>`;
   document.getElementById('r-desc').value='';
   openM('m-raise');
 }
@@ -853,6 +1060,13 @@ function submitEsc(){
     const uid=getNextDutyAgent(team);
     if(!uid){showToast(`No agents on duty for ${team}`,'⚠️');return}
     aTo=uid;
+    // Check if RR-assigned agent is on leave
+    const rrU=getU(uid);
+    if(rrU?.onLeave){
+      const tl2=DB.users().find(x=>x.id===rrU.reportsTo&&RA[x.role]>=2)
+        ||DB.users().find(x=>RA[x.role]===2&&uTeams(x).some(t=>uTeams(rrU).includes(t)));
+      if(tl2)leaveRedirect={from:uid,to:tl2.id};
+    }
   } else {
     aTo=aToRaw;
     const u=getU(aToRaw);
@@ -881,6 +1095,7 @@ function submitEsc(){
 
 // ── DETAIL MODAL ──
 function openDetail(id){
+  _pa=null; // clear any stale remark callback from previous modal
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   const isR=CU.id===e.raisedBy,isA=CU.id===e.assignedTo;
   const ru=getU(e.raisedBy),au=getU(e.assignedTo);
@@ -917,9 +1132,11 @@ function openDetail(id){
     const st=mySubtree();
     const raisedByMyTeam=st.includes(e.raisedBy);
     const isTL=myAcc()===2;
+    const allTeams2=[...new Set(DB.users().flatMap(u=>uTeams(u)))];
+    const rrEnrolled2=new Set(allTeams2.filter(t=>DUTY[t]?.rr&&DUTY[t].users.length).flatMap(t=>DUTY[t].users));
     const pool=isTL&&!raisedByMyTeam
-      ? DB.users().filter(u=>u.id!==e.assignedTo&&st.includes(u.id))
-      : DB.users().filter(u=>u.id!==e.assignedTo);
+      ? DB.users().filter(u=>u.id!==e.assignedTo&&st.includes(u.id)&&!rrEnrolled2.has(u.id))
+      : DB.users().filter(u=>u.id!==e.assignedTo&&!rrEnrolled2.has(u.id));
     M.reassign='';
     reassignHtml=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)">
       <div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">🔄 Reassign${isTL&&!raisedByMyTeam?' <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--g400)">(limited to your team)</span>':''}</div>
@@ -941,7 +1158,7 @@ function openDetail(id){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div><div class="dr"><span class="dl">Priority</span><span class="dv">${pbadge(e.priority)}</span></div><div class="dr"><span class="dl">Due</span><span class="dv">${fmtDue(e.due)}</span></div><div class="dr"><span class="dl">Raised</span><span class="dv">${timeAgo(e.createdAt)}</span></div></div>
-      <div><div class="dr"><span class="dl">Status</span><span class="dv">${sbadge(e.status)}</span></div><div class="dr"><span class="dl">Raised By</span><span class="dv">${av(e.raisedBy,20)}<span style="font-size:12px;margin-left:5px">${ru.nick||ru.name}</span></span></div><div class="dr"><span class="dl">Assigned To</span><span class="dv">${av(e.assignedTo,20)}<span style="font-size:12px;margin-left:5px">${au.nick||au.name}</span></span></div>${(e.passedThrough||[]).length?`<div class="dr"><span class="dl">Was With</span><span class="dv" style="font-size:12px">${e.passedThrough.map(uid=>dN(uid)).join(', ')}</span></div>`:''}</div>
+      <div><div class="dr"><span class="dl">Status</span><span class="dv">${sbadge(e.status)}${e.everDisputed?' <span style="font-size:10px;background:#fef9c3;color:#92400e;border:1px solid #fbbf24;border-radius:3px;padding:1px 5px;font-weight:700;margin-left:4px">⚠️ Disputed</span>':''}</span></div><div class="dr"><span class="dl">Raised By</span><span class="dv">${av(e.raisedBy,20)}<span style="font-size:12px;margin-left:5px">${ru.nick||ru.name}</span></span></div><div class="dr"><span class="dl">Assigned To</span><span class="dv">${av(e.assignedTo,20)}<span style="font-size:12px;margin-left:5px">${au.nick||au.name}</span></span></div>${(e.passedThrough||[]).length?`<div class="dr"><span class="dl">Was With</span><span class="dv" style="font-size:12px">${e.passedThrough.map(uid=>dN(uid)).join(', ')}</span></div>`:''}</div>
     </div>
     <div style="background:var(--g50);border-radius:8px;padding:13px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:5px">Description</div><div style="font-size:13px;color:var(--g700);line-height:1.7">${e.desc}</div></div>
     ${e.remarks?`<div style="background:var(--greenl);border-left:4px solid var(--green);border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:4px">✅ RESOLUTION</div><div style="font-size:13px;color:var(--g700)">${e.remarks}</div></div>`:''}
@@ -963,7 +1180,12 @@ function submitComment(id){
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   e.activity.push({user:CU.id,text:'💬 '+txt,time:new Date().toISOString()});
   e.updatedAt=new Date().toISOString();
-  DB.saveE(es);showToast('Comment added');bcast('r');openDetail(id);
+  DB.saveE(es);
+  // Notify assignee and raiser (skip self-notification)
+  const preview=txt.length>60?txt.slice(0,57)+'…':txt;
+  if(e.assignedTo&&e.assignedTo!==CU.id)addNotif(e.assignedTo,id,`💬 ${CU.nick||CU.name} commented on ${id}: "${preview}"`,'in');
+  if(e.raisedBy&&e.raisedBy!==CU.id&&e.raisedBy!==e.assignedTo)addNotif(e.raisedBy,id,`💬 ${CU.nick||CU.name} commented on ${id}: "${preview}"`,'my');
+  showToast('Comment added');bcast('r');bcast('n');openDetail(id);
 }
 
 // ── ACTIONS ──
@@ -971,7 +1193,7 @@ function saveEditMeta(id){
   const pri=document.getElementById('ep')?.value,due=document.getElementById('ed')?.value;
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   if(!['pending','processing'].includes(e.status)){showToast('Cannot edit in this status','⚠️');return}
-  const ch=[];if(pri&&pri!==e.priority){ch.push(`Priority: ${e.priority}→${pri}`);e.priority=pri}if(due&&new Date(due).toISOString()!==e.due){ch.push('Due date updated');e.due=new Date(due).toISOString()}
+  const ch=[];if(pri&&pri!==e.priority){ch.push(`Priority: ${e.priority}→${pri}`);e.priority=pri}if(due){if(new Date(due)<new Date(localISO())){showToast('Due date cannot be in the past','⚠️');return}if(new Date(due).toISOString()!==e.due){ch.push('Due date updated');e.due=new Date(due).toISOString()}}
   if(!ch.length){showToast('No changes','⚠️');return}
   e.updatedAt=new Date().toISOString();e.activity.push({user:CU.id,text:`Edited: ${ch.join(', ')}`,time:new Date().toISOString()});
   DB.saveE(es);closeM('m-detail');showToast('Saved ✓');bcast('r');navigate(CP);
@@ -980,14 +1202,14 @@ function updateStatus(id,ns,rmk){
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   const lbl={pending:'Pending',processing:'Processing',onhold:'On Hold',closed:'Closed'};
   e.status=ns;e.updatedAt=new Date().toISOString();e.activity.push({user:CU.id,text:`Status → ${lbl[ns]}${rmk?`. Remarks: "${rmk}"`:'.'}`,time:new Date().toISOString()});
-  DB.saveE(es);addNotif(e.raisedBy,id,`${CU.name} changed ${id} → ${lbl[ns]}${rmk?': "'+rmk+'"':''}`, 'my');
+  DB.saveE(es);addNotif(e.raisedBy,id,`${CU.nick||CU.name} changed ${id} → ${lbl[ns]}${rmk?': "'+rmk+'"':''}`, 'my');
   closeM('m-detail');showToast(`→ ${lbl[ns]}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 function resolveEsc(id,rmk){
   if(!rmk){showToast('Resolution remarks required','⚠️');return}
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   e.status='closed';e.remarks=rmk;e.updatedAt=new Date().toISOString();e.activity.push({user:CU.id,text:`Closed. Remarks: "${rmk}"`,time:new Date().toISOString()});
-  DB.saveE(es);addNotif(e.raisedBy,id,`${CU.name} closed ${id}: "${rmk}"`,'my');
+  DB.saveE(es);addNotif(e.raisedBy,id,`${CU.nick||CU.name} closed ${id}: "${rmk}"`,'my');
   closeM('m-detail');showToast(`${id} closed 🎉`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 function escalateEsc(id,rmk){
@@ -1004,20 +1226,20 @@ function escalateEsc(id,rmk){
   if(!tgt){showToast('No escalation target found','⚠️');return}
   const pt=e.passedThrough||[];if(!pt.includes(e.assignedTo))pt.push(e.assignedTo);
   e.assignedTo=tgt.id;e.passedThrough=pt;e.status='pending';e.updatedAt=new Date().toISOString();
-  e.activity.push({user:CU.id,text:`Escalated → ${tgt.name}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
-  DB.saveE(es);addNotif(tgt.id,id,`${CU.name} escalated ${id} to you [${e.priority}]`,'in');addNotif(e.raisedBy,id,`${id} escalated to ${tgt.name}`,'my');
-  closeM('m-detail');showToast(`Escalated to ${tgt.name}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
+  e.activity.push({user:CU.id,text:`Escalated → ${dN(tgt.id)}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
+  DB.saveE(es);addNotif(tgt.id,id,`${dN(CU.id)} escalated ${id} to you [${e.priority}]`,'in');addNotif(e.raisedBy,id,`${id} escalated to ${dN(tgt.id)}`,'my');
+  closeM('m-detail');showToast(`Escalated to ${dN(tgt.id)}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 function doReassign(id,rmk){
   const selRaw=M.reassign;if(!selRaw){showToast('Select a person','⚠️');return}
   const sel=resolveLeaveAssign(selRaw); // redirect if on leave
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
-  const oldNm=getU(e.assignedTo).name,nU=getU(sel);
+  const oldNm=dN(e.assignedTo),nU=getU(sel);
   const pt=e.passedThrough||[];if(!pt.includes(e.assignedTo))pt.push(e.assignedTo);
   e.assignedTo=sel;e.passedThrough=pt;e.status='pending';e.updatedAt=new Date().toISOString();
-  e.activity.push({user:CU.id,text:`Reassigned ${oldNm} → ${nU.name}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
-  DB.saveE(es);addNotif(sel,id,`${CU.name} reassigned ${id} to you${rmk?': "'+rmk+'"':''}`,'in');if(e.raisedBy!==CU.id)addNotif(e.raisedBy,id,`${id} reassigned to ${nU.name}`,'my');
-  closeM('m-detail');showToast(`Reassigned to ${nU.name}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
+  e.activity.push({user:CU.id,text:`Reassigned ${oldNm} → ${dN(sel)}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
+  DB.saveE(es);addNotif(sel,id,`${CU.nick||CU.name} reassigned ${id} to you${rmk?': "'+rmk+'"':''}`,'in');if(e.raisedBy!==CU.id)addNotif(e.raisedBy,id,`${id} reassigned to ${dN(sel)}`,'my');
+  closeM('m-detail');showToast(`Reassigned to ${dN(sel)}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 
 // ── REPORTS ──
@@ -1028,6 +1250,7 @@ function scopedEscs(){
   return DB.escs().filter(e=>e.raisedBy===CU.id||e.assignedTo===CU.id);
 }
 function renderReports(){
+  if(!isTeam())return`<div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Access restricted.</div></div></div>`;
   const st=myAcc()===2?mySubtree():null;
   const users=st?DB.users().filter(u=>st.includes(u.id)):DB.users();
   const teams=[...new Set(users.flatMap(u=>uTeams(u)))],cats=Object.keys(DB.cats());
@@ -1095,9 +1318,9 @@ function exportXLSX(){
   const es=applyRF(scopedEscs());
   const rows=es.map(e=>({
     'ID':e.id,'Company':e.company,'Category':e.category,'Sub-Category':e.subcategory,
-    'Priority':e.priority,'Status':e.status,'Raised By':getU(e.raisedBy).name,
+    'Priority':e.priority,'Status':e.status,'Disputed':e.everDisputed?'Yes':'No','Raised By':getU(e.raisedBy).name,
     'Raised By Team':uTeams(getU(e.raisedBy)).join(', '),'Assigned To':getU(e.assignedTo).name,
-    'Assigned Team':uTeams(getU(e.assignedTo)).join(', '),'Passed Through':e.passedThrough.map(id=>getU(id).name).join(', '),
+    'Assigned Team':uTeams(getU(e.assignedTo)).join(', '),'Passed Through':(e.passedThrough||[]).map(id=>dN(id)).join(', '),
     'Description':e.desc,'Resolution':e.remarks,'Created At':new Date(e.createdAt).toLocaleString('en-IN'),
     'Due Date':e.due?new Date(e.due).toLocaleString('en-IN'):'—',
     'Last Updated':new Date(e.updatedAt).toLocaleString('en-IN'),
@@ -1105,12 +1328,13 @@ function exportXLSX(){
   }));
   if(!rows.length){showToast('No data to export','⚠️');return}
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);
-  const colW=[{wch:18},{wch:28},{wch:22},{wch:26},{wch:10},{wch:12},{wch:16},{wch:12},{wch:16},{wch:12},{wch:20},{wch:40},{wch:30},{wch:18},{wch:18},{wch:18},{wch:60}];ws['!cols']=colW;
+  const colW=[{wch:18},{wch:28},{wch:22},{wch:26},{wch:10},{wch:12},{wch:16},{wch:12},{wch:16},{wch:12},{wch:20},{wch:40},{wch:30},{wch:18},{wch:18},{wch:18},{wch:20},{wch:80}];ws['!cols']=colW;
   XLSX.utils.book_append_sheet(wb,ws,'Escalations');XLSX.writeFile(wb,`escalations_${localDate()}.xlsx`);showToast('Excel downloaded ✓');
 }
 
 // ── ADMIN PANEL ──
 function renderAdmin(){
+  if(!isFull())return`<div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Access restricted.</div></div></div>`;
   return `<div class="ph"><div><div class="ptitle">⚙️ Admin Panel</div></div></div>
   <div class="tabs">${[['users','👤 Users'],['companies','🏢 Companies'],['categories','🗂 Categories']].map(([t,l])=>`<button class="tab${adminTab===t?' active':''}" onclick="setAdminTab('${t}')">${l}</button>`).join('')}</div>
   ${adminTab==='users'?renderAdminUsers():adminTab==='companies'?renderAdminCos():renderAdminCats()}`;
@@ -1133,7 +1357,7 @@ function renderAdminUsers(){
     <input type="hidden" id="uf-id">
   </div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p btn-sm" onclick="saveUser()">Save</button><button class="btn btn-o btn-sm" onclick="document.getElementById('uf-wrap').style.display='none'">Cancel</button></div></div></div>
   <div class="tw"><table><thead><tr><th></th><th>Name</th><th>Code</th><th>Mobile</th><th>Role</th><th>Teams</th><th>Reports To</th><th>Password</th><th></th></tr></thead>
-  <tbody>${us.map(u=>`<tr><td>${av(u.id,26)}</td><td><strong>${u.name}</strong>${u.nick?`<div style="font-size:11px;color:var(--p)">${u.nick}</div>`:''}</td><td><span style="font-size:12px;font-weight:700;font-family:monospace;color:var(--p);background:var(--pl);padding:2px 7px;border-radius:4px">${u.userCode||'—'}</span></td><td>${u.mobile}</td><td>${RLBL[u.role]||u.role}</td><td>${uTeams(u).join(', ')}</td><td style="font-size:12px;color:var(--p)">${u.reportsTo?getU(u.reportsTo).name:'—'}</td><td style="font-size:12px;color:var(--g400);font-family:monospace">${u.pass}</td><td style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="editUser('${u.id}')">Edit</button><button class="btn btn-r btn-sm" onclick="delUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  <tbody>${us.map(u=>`<tr><td>${av(u.id,26)}</td><td><strong>${u.name}</strong>${u.nick?`<div style="font-size:11px;color:var(--p)">${u.nick}</div>`:''}</td><td><span style="font-size:12px;font-weight:700;font-family:monospace;color:var(--p);background:var(--pl);padding:2px 7px;border-radius:4px">${u.userCode||'—'}</span></td><td>${u.mobile}</td><td>${RLBL[u.role]||u.role}</td><td>${uTeams(u).join(', ')}</td><td style="font-size:12px;color:var(--p)">${u.reportsTo?getU(u.reportsTo).name:'—'}</td><td style="font-size:12px;color:var(--g400);font-family:monospace">••••••</td><td style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="editUser('${u.id}')">Edit</button><button class="btn btn-r btn-sm" onclick="delUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function showUserForm(u){
   document.getElementById('uf-wrap').style.display='block';
@@ -1150,7 +1374,10 @@ function saveUser(){
   if(!/^\d{10}$/.test(mobile)){showToast('Mobile: 10 digits','⚠️');return}
   const teams=teamsRaw.split(',').map(t=>t.trim()).filter(Boolean);
   const us=DB.users();
-  if(id){const i=us.findIndex(u=>u.id===id);if(i>=0)Object.assign(us[i],{name,nick,mobile,role,pass,color,teams,reportsTo:reportsTo||''})}
+  if(id){
+    if(us.find(u=>u.mobile===mobile&&u.id!==id)){showToast('Mobile taken by another user','⚠️');return}
+    const i=us.findIndex(u=>u.id===id);if(i>=0)Object.assign(us[i],{name,nick,mobile,role,pass,color,teams,reportsTo:reportsTo||''})
+  }
   else{
     if(us.find(u=>u.mobile===mobile)){showToast('Mobile taken','⚠️');return}
     const takenSet=new Set(us.map(u=>u.userCode).filter(Boolean));
@@ -1287,8 +1514,8 @@ function renderAdminCats(){
   const cats=DB.cats(),names=Object.keys(cats);if(!catTab||!cats[catTab])catTab=names[0]||'';
   return `<div style="display:flex;gap:14px;align-items:flex-start">
     <div class="card" style="width:210px;flex-shrink:0"><div class="ch"><span class="ct">Categories</span><div style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="dlCatTemplate()" title="Download CSV template">⬇</button><label class="btn btn-o btn-sm" style="cursor:pointer" title="Import CSV">📥<input type="file" accept=".csv,.xlsx" style="display:none" onchange="importCatsCSV(this)"></label><button class="btn btn-p btn-sm" onclick="addCat()">+</button></div></div>
-      <div style="padding:6px">${names.map(c=>`<div onclick="catTab='${encodeURIComponent(c)}';navigate('admin')" style="padding:8px 11px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;${catTab===c?'background:var(--pl);color:var(--p);font-weight:600':'color:var(--g700)'}">
-        <span>${c}</span><button onclick="event.stopPropagation();delCat('${encodeURIComponent(c)}')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer">✕</button>
+      <div style="padding:6px">${names.map(c=>`<div onclick="catTab='${c.replace(/'/g,"\\'")}';navigate('admin')" style="padding:8px 11px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;${catTab===c?'background:var(--pl);color:var(--p);font-weight:600':'color:var(--g700)'}">
+        <span>${c}</span><button onclick="event.stopPropagation();delCat('${c.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer">✕</button>
       </div>`).join('')}</div></div>
     <div class="card" style="flex:1"><div class="ch"><span class="ct">Sub-Categories — ${catTab||'Select category'}</span></div><div class="cb">
       ${catTab?`<div style="display:flex;gap:8px;margin-bottom:12px"><input id="sub-new" class="inp" style="flex:1" placeholder="New sub-category"><button class="btn btn-p btn-sm" onclick="addSub()">+ Add</button></div>
@@ -1298,7 +1525,7 @@ function renderAdminCats(){
   </div>`;
 }
 function addCat(){const n=prompt('Category name:')?.trim();if(!n)return;const cats=DB.cats();if(cats[n]){showToast('Exists','⚠️');return}cats[n]=[];DB.saveK(cats);catTab=n;navigate('admin')}
-function delCat(enc){const n=decodeURIComponent(enc);if(!confirm(`Delete "${n}"?`))return;const cats=DB.cats();delete cats[n];DB.saveK(cats);catTab='';navigate('admin')}
+function delCat(n){if(!confirm(`Delete "${n}"?`))return;const cats=DB.cats();delete cats[n];DB.saveK(cats);catTab='';navigate('admin')}
 function addSub(){const inp=document.getElementById('sub-new'),v=inp.value.trim();if(!v||!catTab)return;const cats=DB.cats();if(!cats[catTab])cats[catTab]=[];if(cats[catTab].includes(v)){showToast('Exists','⚠️');return}cats[catTab].push(v);DB.saveK(cats);inp.value='';navigate('admin')}
 function delSub(i){if(!confirm('Remove?'))return;const cats=DB.cats();cats[catTab].splice(i,1);DB.saveK(cats);navigate('admin')}
 
@@ -1328,7 +1555,7 @@ async function importCatsCSV(input){
     if(!cats[cat])cats[cat]=[];
     if(!cats[cat].includes(sub)){cats[cat].push(sub);added++}
   });
-  await DB.saveK(cats);
+  DB.saveK(cats);
   showToast(`✅ ${added} subcategories imported!`);navigate('admin');
 }
 
@@ -1373,7 +1600,11 @@ function renderNotifPanel(){
   }
   body.innerHTML=html;
 }
-function notifDispute(escId){closeM('m-notif');openDetail(escId);setTimeout(()=>raiseDispute(escId),200);}
+function notifDispute(escId){
+  const e=DB.escs().find(x=>x.id===escId);
+  if(!e||e.status!=='closed'){showToast('Can only dispute closed tickets','⚠️');return;}
+  closeM('m-notif');openDetail(escId);setTimeout(()=>raiseDispute(escId),200);
+}
 function markNotifRead(id){
   const all=DB.notifs(),n=all.find(x=>x.id===id);
   if(!n)return;
@@ -1458,7 +1689,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('#esc-search-wrap'))c
 function showToast(msg,icon='✅'){
   const t=document.getElementById('toast');
   t.innerHTML=`<span style="font-size:16px">${icon}</span><span>${msg}</span>`;
-  t.className='show';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3200);
+  t.className='';void t.offsetWidth;t.className='show';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3200);
 }
 
 // ── PAGINATION ──
@@ -1483,7 +1714,10 @@ function setFollowUp(id,flag){
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   e.followUp=!!flag;e.followUpAt=flag?new Date().toISOString():'';
   e.activity.push({user:CU.id,text:flag?'🚩 Flagged for follow-up':'🚩 Follow-up removed',time:new Date().toISOString()});
-  DB.saveE(es);closeM('m-detail');showToast(flag?'🚩 Follow-up flagged':'Flag removed');bcast('r');navigate(CP);
+  DB.saveE(es);
+  if(flag&&e.assignedTo&&e.assignedTo!==CU.id)addNotif(e.assignedTo,id,`🚩 ${CU.nick||CU.name} flagged ${id} for follow-up`,'in');
+  if(flag&&e.raisedBy&&e.raisedBy!==CU.id&&e.raisedBy!==e.assignedTo)addNotif(e.raisedBy,id,`🚩 ${id} flagged for follow-up by ${CU.nick||CU.name}`,'my');
+  closeM('m-detail');showToast(flag?'🚩 Follow-up flagged':'Flag removed');bcast('r');bcast('n');navigate(CP);
 }
 
 // ── #3 DISPUTE FEATURE ──
@@ -1492,6 +1726,7 @@ function raiseDispute(id){
 }
 function doRaiseDispute(id,rmk){
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
+  if(e.status!=='closed'){showToast('Can only dispute a closed ticket','⚠️');return;}
   const au=getU(e.assignedTo);
   const tl=DB.users().find(u=>u.id===au.reportsTo&&RA[u.role]>=2)
     ||DB.users().find(u=>RA[u.role]===2&&uTeams(u).some(t=>uTeams(au).includes(t)));
@@ -1501,7 +1736,7 @@ function doRaiseDispute(id,rmk){
   const closedBy=closedByAct?.user;
   const closedByMgr=closedBy?DB.users().find(u=>u.id===getU(closedBy)?.reportsTo&&RA[u.role]>=3)
     ||DB.users().find(u=>RA[u.role]>=3&&uTeams(u).some(t=>uTeams(getU(closedBy)).includes(t))):null;
-  e.status='disputed';e.assignedTo=newA;e.updatedAt=new Date().toISOString();
+  e.status='disputed';e.assignedTo=newA;e.everDisputed=true;e.updatedAt=new Date().toISOString();
   e.activity.push({user:CU.id,text:`⚠️ Dispute raised. Reason: "${rmk}". Reassigned to ${dN(newA)} for review.`,time:new Date().toISOString()});
   DB.saveE(es);
   addNotif(newA,id,`⚠️ Dispute raised on ${id} by ${CU.nick||CU.name}: "${rmk}"`,'in');
@@ -1549,10 +1784,10 @@ function renderDutyPage(){
     if(!DUTY[team])DUTY[team]={users:[],idx:0,date:today,rr:false};
     if(DUTY[team].date!==today){DUTY[team].users=[];DUTY[team].idx=0;DUTY[team].date=today;}
     const onDuty=DUTY[team].users,rr=DUTY[team].rr;
-    const rrColor=rr?'var(--purple)':'var(--g300)';
+    const rrColor=rr?'var(--violet)':'var(--g300)';
     h+=`<div class="card" style="margin-bottom:12px"><div class="ch"><span class="ct">${team}</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-sm" style="background:${rr?'var(--purplel, #f3eeff)':'var(--g100)'};color:${rr?'var(--purple)':'var(--g500)'};border:1px solid ${rrColor};font-weight:600" onclick="toggleRR('${team}')">🔄 Round Robin ${rr?'ON ✓':'OFF'}</button>
+        <button class="btn btn-sm" style="background:${rr?'var(--violetl)':'var(--g100)'};color:${rr?'var(--violet)':'var(--g500)'};border:1px solid ${rrColor};font-weight:600" onclick="toggleRR('${team}')">🔄 Round Robin ${rr?'ON ✓':'OFF'}</button>
         <button class="btn btn-p btn-sm" onclick="saveTeamDuty('${team}')">💾 Save</button>
       </div></div><div class="cb">`;
     // Agent rotation checkboxes (only relevant when RR is ON)
@@ -1588,7 +1823,9 @@ function saveTeamDuty(team){
   const today=localDate();
   const boxes=[...document.querySelectorAll(`input[data-team="${team}"]`)];
   const users=boxes.filter(b=>b.checked).map(b=>b.dataset.uid);
-  DUTY[team]={users,idx:DUTY[team]?.idx||0,date:today,rr:DUTY[team]?.rr||false};
+  const prevIdx=DUTY[team]?.idx||0;
+  const clampedIdx=users.length?prevIdx%users.length:0;
+  DUTY[team]={users,idx:clampedIdx,date:today,rr:DUTY[team]?.rr||false};
   saveDuty(team,true); // showResult=true shows success/failure popup
   document.getElementById('main').innerHTML=renderDutyPage();
 }
@@ -1636,7 +1873,7 @@ async function returnFromLeave(uid){
   toReview.forEach(e=>{
     const ref=es.find(x=>x.id===e.id);if(!ref)return;
     ref.activity.push({user:'system',text:`🔍 LEAVE_REVIEW: ${uName} returned — TL review needed (${dN(ref.assignedTo)} had activity)`,time:now});
-    const tl=DB.users().find(x=>x.id===CU.id)||DB.users().find(x=>RA[x.role]>=2&&uTeams(x).some(t=>uTeams(getU(uid)).includes(t)));
+    const tl=DB.users().find(x=>x.id===getU(uid)?.reportsTo&&RA[x.role]>=2)||DB.users().find(x=>RA[x.role]>=2&&uTeams(x).some(t=>uTeams(getU(uid)).includes(t)));
     if(tl)addNotif(tl.id,ref.id,`${ref.id}: ${uName} returned from leave — needs reassignment review`,'in');
   });
   DB.saveE(es);bcast('r');bcast('n');buildSidebar();
@@ -1917,6 +2154,8 @@ function refreshView(){
 
 function navigate(page){
   CP=page;PAGE={};F={};DF={};
+  // Default: agents see "Raised by Me" when opening Closed tab
+  if(page==='closed'&&!isTeam()&&!isSenior())F.rby=[CU.id];
   refreshView();buildSidebar();
 }
 </script>
