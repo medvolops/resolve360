@@ -278,7 +278,6 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 <div class="mo" id="m-raise"><div class="md">
   <div class="mh"><span class="mt">🚨 Raise Escalation</span><button class="mc2" onclick="closeM('m-raise')">✕</button></div>
   <div class="mb"><div class="fgrid">
-    <div class="fgroup full"><label>Auto-Assign by Team (Round-Robin)</label><div id="r-team-slot"></div></div>
     <div class="fgroup full"><label>Assign To *</label><div id="ms-assign-slot"></div></div>
     <div class="fgroup full"><label>Company *</label><div id="ms-company-slot"></div></div>
     <div class="fgroup"><label>Category *</label><div id="ms-category-slot"></div></div>
@@ -589,7 +588,18 @@ async function doLogin(){
     DB.setSess(u.id);startSess(u);
   }catch(e){console.error(e);showErr('Connection error. Check your internet and try again.');}
 }
-function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm();loadDuty()}
+function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm();loadDuty().then(()=>checkLeaveExpiry());}
+async function checkLeaveExpiry(){
+  const today=new Date().toISOString().slice(0,10);
+  const expired=DB.users().filter(u=>u.onLeave&&u.leaveUntil&&u.leaveUntil<=today);
+  for(const u of expired){
+    const all=DB.users(),rec=all.find(x=>x.id===u.id);if(!rec)continue;
+    rec.onLeave=false;rec.leaveUntil='';C.users=all;
+    await sb.from('users').update({onLeave:false,leaveUntil:''}).eq('id',u.id);
+    await returnFromLeave(u.id);
+    showToast(`📅 ${u.nick||u.name}'s leave expired — tickets reassigned`,'ℹ️');
+  }
+}
 function requestNotifPerm(){if(!('Notification' in window))return;if(Notification.permission==='default'){setTimeout(()=>Notification.requestPermission(),2000)}}
 function deskNotif(title,body,escId){if(Notification.permission!=='granted')return;const n=new Notification(title,{body,icon:'https://surya-medvol.github.io/resolve360/favicon.ico',tag:escId||'resolve360'});n.onclick=()=>{window.focus();if(escId)openDetail(escId);n.close()}}
 function renderTopbar(){document.getElementById('t-av').innerHTML=av(CU.id,32);document.getElementById('t-name').textContent=CU.nick||CU.name}
@@ -669,7 +679,8 @@ function buildSidebar(){
   h+=sec('myteam','My Team',[ni2r('team-active','🔥','Team Active',tActive),ni2r('team-raised','📤','Team Raised',tRaised)]);
   if(isTeam())h+=sec('team','Team View',[ni2r('team-dashboard','👥','Team Overview',allOpen),ni2('team-pending','📌','Team Pending'),ni2('reports','📈','Reports & Analytics')]);
   if(isFull())h+=sec('mgr',isSenior()?'Senior Mgmt':'Manager',[ni2r('mgr-overview','🏢','All Teams',allOpen),ni2('mgr-agents','👤','Agent-wise'),ni2('admin','⚙️','Admin Panel')]);
-  h+=sec('flags','Flags & Disputes',[ni2r('followup','🚩','Follow-up',fuCnt||''),ni2r('disputed','⚠️','Disputed',dispCnt||'')]);
+  const lrCnt=isTeam()?cnt(e=>e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW'))&&e.status!=='closed'):0;
+  h+=sec('flags','Flags & Disputes',[ni2r('followup','🚩','Follow-up',fuCnt||''),ni2r('disputed','⚠️','Disputed',dispCnt||''),...(lrCnt?[ni2r('leave-review','🏖','Leave Review',lrCnt)]:[] )]);
   if(isTeam())h+=sec('rota','Duty Roster',[ni2('duty','🗓','Today\'s Roster')]);
   h+=sec('arch','Archive',[ni2('closed','✅','Closed')]);
   document.getElementById('sidebar').innerHTML=h;
@@ -733,6 +744,7 @@ function renderList(page){
     'closed':{title:'✅ Closed',filter:e=>e.status==='closed'},
     'disputed':{title:'⚠️ Disputed',filter:e=>e.status==='disputed',r:true,a:true},
     'followup':{title:'🚩 Follow-up Flagged',filter:e=>e.followUp&&e.status!=='closed',r:true,a:true},
+    'leave-review':{title:'🏖 Leave Review',filter:e=>e.status!=='closed'&&e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW')),r:true,a:true},
   };
   const c=cfg[page]||cfg['raised-all'];const raw=es.filter(c.filter);const list=applyF(raw);
   const dateBar=page==='closed'?`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--g500)">📅 Closed date:</span><input type="date" class="ss-inp" style="width:140px" value="${F.from||''}" onchange="F.from=this.value;refreshView()"><span style="font-size:12px;color:var(--g400)">to</span><input type="date" class="ss-inp" style="width:140px" value="${F.to||''}" onchange="F.to=this.value;refreshView()"></div>`:'';
@@ -797,9 +809,16 @@ function escTable(list,showR=true,showA=true,pgKey=''){
 // ── RAISE MODAL ──
 function openRaiseModal(){
   M={assign:'',company:'',cat:'',subcat:'',priority:'',due:new Date(Date.now()+86400000).toISOString().slice(0,16),desc:''};
-  const users=DB.users().filter(u=>u.id!==CU.id);
   const cats=DB.cats(),catKeys=Object.keys(cats);
-  document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',['',...users.map(u=>u.id)],['— Select —',...users.map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)]);
+  // Build assign-to: RR teams first, then individual agents (on-leave shown grey)
+  const rrVals=[],rrLbls=[];
+  const allTeams=[...new Set(DB.users().flatMap(u=>uTeams(u)))];
+  allTeams.forEach(t=>{if(DUTY[t]?.rr&&DUTY[t].users.length){rrVals.push('rr:'+t);rrLbls.push(`🔄 ${t} (Round Robin)`)}});
+  const indivUsers=DB.users().filter(u=>u.id!==CU.id);
+  const assignVals=['',...rrVals,...indivUsers.map(u=>u.id)];
+  const assignLbls=['— Select —',...rrLbls,...indivUsers.map(u=>`${u.nick||u.name}${u.onLeave?' 🏖 (On Leave)':''} — ${uTeams(u).join(', ')}`)];
+  const assignStyles=['',...rrVals.map(()=>''),...indivUsers.map(u=>u.onLeave?'color:var(--g400);background:var(--g50)':'')];
+  document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',assignVals,assignLbls,'',assignStyles);
   document.getElementById('ms-company-slot').innerHTML=mkMS('company',['',...DB.cos()],['— Select —',...DB.cos()]);
   document.getElementById('ms-category-slot').innerHTML=mkMS('cat',['',...catKeys],['— Select —',...catKeys],'onRCatPick');
   document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',[''],['— Select category first —']);
@@ -822,10 +841,36 @@ function submitEsc(){
   const desc=document.getElementById('r-desc').value.trim();
   const [aToRaw,co,cat,sub,pri]=[M.assign,M.company,M.cat,M.subcat,M.priority];
   if(!aToRaw||!co||!cat||!sub||!pri||!due||!desc){showToast('Fill all fields','⚠️');return}
-  const aTo=resolveLeaveAssign(aToRaw); // redirect if on leave
+  // Resolve RR team → actual agent via round-robin
+  let aTo,leaveRedirect=null;
+  if(aToRaw.startsWith('rr:')){
+    const team=aToRaw.slice(3);
+    const uid=getNextDutyAgent(team);
+    if(!uid){showToast(`No agents on duty for ${team}`,'⚠️');return}
+    aTo=uid;
+  } else {
+    aTo=aToRaw;
+    const u=getU(aToRaw);
+    if(u?.onLeave){
+      const tl=DB.users().find(x=>x.id===u.reportsTo&&RA[x.role]>=2)
+        ||DB.users().find(x=>RA[x.role]===2&&uTeams(x).some(t=>uTeams(u).includes(t)));
+      if(tl){leaveRedirect={from:aToRaw,to:tl.id};aTo=aToRaw;} // assign to original first, redirect below
+    }
+  }
   const es=DB.escs();
   const e={id:genId(),company:co,category:cat,subcategory:sub,priority:pri,desc,raisedBy:CU.id,assignedTo:aTo,passedThrough:[],status:'pending',due:new Date(due).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),remarks:'',activity:[{user:CU.id,text:`Raised → assigned to ${dN(aTo)}. Remarks: "${desc}"`,time:new Date().toISOString()}]};
-  es.push(e);DB.saveE(es);addNotif(aTo,e.id,`New from ${CU.nick||CU.name}: ${co} — ${sub} [${pri}]`,'in');
+  // If assignee is on leave, immediately redirect to their TL
+  if(leaveRedirect){
+    const{from:lf,to:lt}=leaveRedirect;
+    e.passedThrough=[lf];
+    e.assignedTo=lt;
+    e.activity.push({user:'system',text:`🏖 ${dN(lf)} is on leave — auto-reassigned to ${dN(lt)}`,time:new Date().toISOString()});
+    es.push(e);DB.saveE(es);
+    addNotif(lf,e.id,`Ticket raised for you but auto-redirected to ${dN(lt)} (you are on leave)`,'in');
+    addNotif(lt,e.id,`${CU.nick||CU.name} raised ${e.id} — auto-assigned to you (${dN(lf)} on leave)`,'in');
+  } else {
+    es.push(e);DB.saveE(es);addNotif(aTo,e.id,`New from ${CU.nick||CU.name}: ${co} — ${sub} [${pri}]`,'in');
+  }
   closeM('m-raise');showToast(`${e.id} submitted!`);bcast('r');bcast('n');navigate('raised-open');buildSidebar();
 }
 
@@ -1449,11 +1494,11 @@ function raiseDispute(id){
 var DUTY={};// {team:{users:[uid,...],idx:0,date:'YYYY-MM-DD'}}
 async function loadDuty(){
   const{data}=await sb.from('duty').select('*');
-  if(data)data.forEach(d=>{DUTY[d.id]={users:d.userIds||[],idx:d.rotaIdx||0,date:d.date||''}});
+  if(data)data.forEach(d=>{DUTY[d.id]={users:d.userIds||[],idx:d.rotaIdx||0,date:d.date||'',rr:d.rr||false}});
 }
 async function saveDuty(team){
-  const d=DUTY[team]||{users:[],idx:0,date:''};
-  await sb.from('duty').upsert({id:team,userIds:d.users,rotaIdx:d.idx,date:d.date});
+  const d=DUTY[team]||{users:[],idx:0,date:'',rr:false};
+  await sb.from('duty').upsert({id:team,userIds:d.users,rotaIdx:d.idx,date:d.date,rr:d.rr||false});
 }
 function getNextDutyAgent(team){
   const d=DUTY[team];if(!d||!d.users.length)return null;
@@ -1461,26 +1506,32 @@ function getNextDutyAgent(team){
   d.idx=(d.idx+1)%d.users.length;
   saveDuty(team);return uid;
 }
-function autoAssignTeam(team){
-  if(!team){document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',['',...DB.users().filter(u=>u.id!==CU.id).map(u=>u.id)],['— Select —',...DB.users().filter(u=>u.id!==CU.id).map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)]);return}
-  const uid=getNextDutyAgent(team);
-  if(!uid){showToast(`No agents on duty for ${team}`,'⚠️');return}
-  M.assign=uid;
-  const u=getU(uid);
-  document.getElementById('ms-assign-slot').innerHTML=`<div class="ss-inp" style="background:var(--greenl);border-color:var(--green);color:var(--g800)">✅ Auto: ${u.nick||u.name}</div>`;
+function toggleRR(team){
+  if(!DUTY[team])DUTY[team]={users:[],idx:0,date:'',rr:false};
+  DUTY[team].rr=!DUTY[team].rr;
+  saveDuty(team);
+  document.getElementById('main').innerHTML=renderDutyPage();
+  showToast(DUTY[team].rr?`🔄 Round Robin ON for ${team}`:`Round Robin OFF for ${team}`);
 }
 function renderDutyPage(){
   if(!isTeam())return`<div class="ph"><div class="ptitle">🗓 Duty Roster</div></div><div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Team leads only</div></div></div>`;
   const st=mySubtree(),myTeams=[...new Set(DB.users().filter(u=>st.includes(u.id)).flatMap(u=>uTeams(u)))];
   const today=new Date().toISOString().slice(0,10);
-  let h=`<div class="ph"><div><div class="ptitle">🗓 Today's Duty Roster</div><div class="psub">Select who is working today for auto-assignment</div></div></div>`;
+  let h=`<div class="ph"><div><div class="ptitle">🗓 Today's Duty Roster</div><div class="psub">Manage team rotation and leave</div></div></div>`;
   myTeams.forEach(team=>{
     const members=DB.users().filter(u=>uTeams(u).includes(team)&&st.includes(u.id));
     if(!members.length)return;
-    if(!DUTY[team]||DUTY[team].date!==today){DUTY[team]={users:DUTY[team]?.date===today?DUTY[team].users:[],idx:0,date:today}}
-    const onDuty=DUTY[team].users;
-    h+=`<div class="card" style="margin-bottom:12px"><div class="ch"><span class="ct">${team}</span><button class="btn btn-p btn-sm" onclick="saveTeamDuty('${team}')">💾 Save Roster</button></div><div class="cb">`;
-    h+=`<div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">✅ On Duty Today (check to include in rotation)</div>`;
+    if(!DUTY[team])DUTY[team]={users:[],idx:0,date:today,rr:false};
+    if(DUTY[team].date!==today){DUTY[team].users=[];DUTY[team].idx=0;DUTY[team].date=today;}
+    const onDuty=DUTY[team].users,rr=DUTY[team].rr;
+    const rrColor=rr?'var(--purple)':'var(--g300)';
+    h+=`<div class="card" style="margin-bottom:12px"><div class="ch"><span class="ct">${team}</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm" style="background:${rr?'var(--purplel, #f3eeff)':'var(--g100)'};color:${rr?'var(--purple)':'var(--g500)'};border:1px solid ${rrColor};font-weight:600" onclick="toggleRR('${team}')">🔄 Round Robin ${rr?'ON ✓':'OFF'}</button>
+        <button class="btn btn-p btn-sm" onclick="saveTeamDuty('${team}')">💾 Save</button>
+      </div></div><div class="cb">`;
+    // Agent rotation checkboxes (only relevant when RR is ON)
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">${rr?'🔄 Agents in Rotation (checked = included)':'✅ On Duty Today'}</div>`;
     h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:16px">`;
     members.forEach(u=>{
       const on=onDuty.includes(u.id)&&!u.onLeave;
@@ -1491,12 +1542,17 @@ function renderDutyPage(){
       </label>`;
     });
     h+=`</div>`;
-    h+=`<div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px;padding-top:12px;border-top:1px solid var(--g100)">🏖 Leave Management (toggle who is on leave)</div>`;
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px;padding-top:12px;border-top:1px solid var(--g100)">🏖 Leave Management</div>`;
     h+=`<div style="display:flex;flex-wrap:wrap;gap:8px">`;
     members.forEach(u=>{
       h+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:6px;border:1px solid ${u.onLeave?'var(--red)':'var(--g200)'};background:${u.onLeave?'var(--redl)':'#fff'}">
         ${av(u.id,22)}<span style="font-size:13px;font-weight:500">${u.nick||u.name}</span>
-        <button class="btn btn-sm" style="background:${u.onLeave?'var(--green)':'var(--red)'};color:#fff;font-size:11px;padding:3px 9px" onclick="toggleLeave('${u.id}')">${u.onLeave?'✓ Back on Duty':'🏖 Mark Leave'}</button>
+        ${u.onLeave
+          ?`${u.leaveUntil?`<span style="font-size:11px;color:var(--red)">Until ${u.leaveUntil}</span>`:''}
+            <button class="btn btn-sm" style="background:var(--green);color:#fff;font-size:11px;padding:3px 9px" onclick="toggleLeave('${u.id}')">✓ Back on Duty</button>`
+          :`<input type="date" id="leave-date-${u.id}" class="inp" style="font-size:11px;padding:3px 7px;width:130px" placeholder="Return date (opt)">
+            <button class="btn btn-sm" style="background:var(--red);color:#fff;font-size:11px;padding:3px 9px" onclick="markLeaveWithDate('${u.id}')">🏖 Mark Leave</button>`
+        }
       </div>`;
     });
     h+=`</div></div></div>`;
@@ -1507,18 +1563,58 @@ function saveTeamDuty(team){
   const today=new Date().toISOString().slice(0,10);
   const boxes=[...document.querySelectorAll(`input[data-team="${team}"]`)];
   const users=boxes.filter(b=>b.checked).map(b=>b.dataset.uid);
-  DUTY[team]={users,idx:DUTY[team]?.idx||0,date:today};
-  saveDuty(team);showToast(`${team} roster saved (${users.length} on duty) ✓`);
+  DUTY[team]={users,idx:DUTY[team]?.idx||0,date:today,rr:DUTY[team]?.rr||false};
+  saveDuty(team);showToast(`${team} roster saved (${users.length} agents) ✓`);
   document.getElementById('main').innerHTML=renderDutyPage();
 }
 
 // ── #5 LEAVE MANAGEMENT ──
-async function toggleLeave(uid){
+async function toggleLeave(uid,returnDate){
   const all=DB.users(),u=all.find(x=>x.id===uid);if(!u)return;
-  u.onLeave=!u.onLeave;
-  C.users=all;await sb.from('users').update({onLeave:u.onLeave}).eq('id',uid);
-  showToast(u.onLeave?`${u.nick||u.name} marked on leave`:`${u.nick||u.name} back on duty`);
+  const goingOnLeave=!u.onLeave;
+  u.onLeave=goingOnLeave;
+  u.leaveUntil=goingOnLeave?(returnDate||''):'';
+  C.users=all;
+  await sb.from('users').update({onLeave:u.onLeave,leaveUntil:u.leaveUntil}).eq('id',uid);
+  if(!goingOnLeave)await returnFromLeave(uid);
+  showToast(goingOnLeave?`${u.nick||u.name} marked on leave`:`${u.nick||u.name} back on duty`);
   document.getElementById('main').innerHTML=renderDutyPage();
+}
+async function markLeaveWithDate(uid){
+  const d=document.getElementById('leave-date-'+uid)?.value||'';
+  await toggleLeave(uid,d);
+}
+// Batch: reassign leave-redirected tickets back when agent returns
+async function returnFromLeave(uid){
+  const uName=dN(uid);
+  const open=DB.escs().filter(e=>e.status!=='closed'&&(e.passedThrough||[]).includes(uid));
+  const toReturn=[],toReview=[];
+  open.forEach(e=>{
+    const redirectIdx=e.activity.findIndex(a=>a.text&&a.text.includes('on leave — auto-reassigned'));
+    if(redirectIdx===-1)return;
+    // Check if the current assignee acted after the redirect
+    const afterActs=e.activity.slice(redirectIdx+1).filter(a=>a.user!=='system'&&a.user!==e.raisedBy);
+    if(afterActs.length>0)toReview.push(e);
+    else toReturn.push(e);
+  });
+  if(!toReturn.length&&!toReview.length)return;
+  const es=DB.escs(),now=new Date().toISOString();
+  toReturn.forEach(e=>{
+    const ref=es.find(x=>x.id===e.id);if(!ref)return;
+    const oldA=ref.assignedTo;
+    ref.assignedTo=uid;ref.updatedAt=now;
+    ref.activity.push({user:'system',text:`🏖 ${uName} returned from leave — reassigned back from ${dN(oldA)}`,time:now});
+    addNotif(uid,ref.id,`Welcome back! ${ref.id} reassigned to you (returned from leave)`,'in');
+    addNotif(oldA,ref.id,`${ref.id} reassigned back to ${uName} (returned from leave)`,'in');
+  });
+  toReview.forEach(e=>{
+    const ref=es.find(x=>x.id===e.id);if(!ref)return;
+    ref.activity.push({user:'system',text:`🔍 LEAVE_REVIEW: ${uName} returned — TL review needed (${dN(ref.assignedTo)} had activity)`,time:now});
+    const tl=DB.users().find(x=>x.id===CU.id)||DB.users().find(x=>RA[x.role]>=2&&uTeams(x).some(t=>uTeams(getU(uid)).includes(t)));
+    if(tl)addNotif(tl.id,ref.id,`${ref.id}: ${uName} returned from leave — needs reassignment review`,'in');
+  });
+  DB.saveE(es);bcast('r');bcast('n');buildSidebar();
+  showToast(`↩ ${toReturn.length} tickets reassigned to ${uName}${toReview.length?`, ${toReview.length} flagged for review`:''}`,'ℹ️');
 }
 function resolveLeaveAssign(uid){
   // If assigned user is on leave, return their TL; else return the uid
@@ -1544,14 +1640,14 @@ function mkSS(key,vals,lbls,ns='F',cb=''){
 }
 // Modal-specific searchable select (stores in window.M)
 var M={};
-function mkMS(key,vals,lbls,cb=''){
+function mkMS(key,vals,lbls,cb='',itemStyles=[]){
   const id=`ms_${key}`;const cur=M[key]||'';const curLbl=cur?lbls[vals.indexOf(cur)]||cur:lbls[0];
   if(cb)_ssCb[id]=cb;
   return `<div class="ss-wrap" id="${id}_w" style="width:100%">
     <div class="ss-inp" onclick="toggleSS('${id}',event)" style="width:100%;box-sizing:border-box;cursor:pointer">${curLbl}</div>
     <div class="ss-drop" id="${id}_d" style="display:none;width:100%;left:0">
       <input class="ss-search" placeholder="🔍 Search…" oninput="filterSS('${id}',this.value)" onclick="event.stopPropagation()">
-      <div id="${id}_list">${vals.map((v,i)=>`<div class="ss-opt${v===cur?' sel':''}" onclick="pickMS('${id}','${key}','${v.replace(/'/g,"\\'")}','${lbls[i].replace(/'/g,"\\'")}','${cb}',event)">${lbls[i]}</div>`).join('')}</div>
+      <div id="${id}_list">${vals.map((v,i)=>`<div class="ss-opt${v===cur?' sel':''}" style="${itemStyles[i]||''}" onclick="pickMS('${id}','${key}','${v.replace(/'/g,"\\'")}','${lbls[i].replace(/'/g,"\\'")}','${cb}',event)">${lbls[i]}</div>`).join('')}</div>
     </div>
   </div>`;
 }
@@ -1787,7 +1883,7 @@ function refreshView(){
     'team-pending':()=>renderList('team-pending'),closed:()=>renderList('closed'),
     'team-dashboard':renderTeamDash,'mgr-overview':renderMgrOverview,'mgr-agents':renderMgrAgents,
     reports:renderReports,admin:renderAdmin,todo:renderTodo,search:renderSearch,
-    disputed:()=>renderList('disputed'),followup:()=>renderList('followup'),duty:renderDutyPage,
+    disputed:()=>renderList('disputed'),followup:()=>renderList('followup'),'leave-review':()=>renderList('leave-review'),duty:renderDutyPage,
   };
   const fn=views[CP];
   if(fn){document.getElementById('main').innerHTML=fn();if(CP==='reports')setTimeout(initCharts,50)}
