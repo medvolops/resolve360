@@ -503,6 +503,9 @@ const timeAgo=iso=>{const d=Date.now()-new Date(iso);if(d<60000)return 'just now
 function fmtDue(iso){if(!iso)return '—';const d=new Date(iso),diff=d-new Date();const lbl=d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});if(diff<0)return `<span class="overdue">⚠ ${lbl}</span>`;if(diff<7200000)return `<span class="due-soon">⏰ ${lbl}</span>`;return lbl}
 const sbadge=s=>{const m={pending:'b-pending',processing:'b-processing',onhold:'b-onhold',closed:'b-closed',disputed:'b-urgent'};const lbl={pending:'⏳ Pending',processing:'🔄 Processing',onhold:'⏸ On Hold',closed:'✅ Closed',disputed:'⚠️ Disputed'};return `<span class="badge ${m[s]||''}">${lbl[s]||s}</span>`};
 const pbadge=p=>{const m={Urgent:'b-urgent',High:'b-high',Medium:'b-medium',Low:'b-low'};return `<span class="badge ${m[p]||''}">${p||'—'}</span>`};
+// Timezone-safe helpers — always use local time, not UTC
+const localISO=(d=new Date())=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+const localDate=(d=new Date())=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 function addNotif(forU,escId,text,type='in'){const n={id:'n'+Date.now(),forUser:forU,escId,text,time:new Date().toISOString(),read:false,type};C.notifs.unshift(n);sb.from('notifications').insert(n).then(r=>r.error&&console.error('addNotif',r.error))}
 const sc=(label,icon,val,color,desc,page)=>`<div class="sc ${color}" onclick="navigate('${page}')"><div class="slabel">${icon} ${label}</div><div class="sval">${val}</div><div class="sdesc">${desc}</div></div>`;
 
@@ -590,7 +593,7 @@ async function doLogin(){
 }
 function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm();loadDuty().then(()=>checkLeaveExpiry());}
 async function checkLeaveExpiry(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const expired=DB.users().filter(u=>u.onLeave&&u.leaveUntil&&u.leaveUntil<=today);
   for(const u of expired){
     const all=DB.users(),rec=all.find(x=>x.id===u.id);if(!rec)continue;
@@ -808,7 +811,7 @@ function escTable(list,showR=true,showA=true,pgKey=''){
 
 // ── RAISE MODAL ──
 function openRaiseModal(){
-  M={assign:'',company:'',cat:'',subcat:'',priority:'',due:new Date(Date.now()+86400000).toISOString().slice(0,16),desc:''};
+  M={assign:'',company:'',cat:'',subcat:'',priority:'',due:localISO(new Date(Date.now()+86400000)),desc:''};
   const cats=DB.cats(),catKeys=Object.keys(cats);
   // Build assign-to: RR teams first, then individual agents (on-leave shown grey)
   const rrVals=[],rrLbls=[];
@@ -823,7 +826,7 @@ function openRaiseModal(){
   document.getElementById('ms-category-slot').innerHTML=mkMS('cat',['',...catKeys],['— Select —',...catKeys],'onRCatPick');
   document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',[''],['— Select category first —']);
   document.getElementById('ms-priority-slot').innerHTML=mkMS('priority',['','Urgent','High','Medium','Low'],['— Select —','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'],'onRPriPick');
-  const nowMin=new Date(Date.now()-60000).toISOString().slice(0,16); // 1-min grace
+  const nowMin=localISO(new Date(Date.now()-60000)); // 1-min grace
   const dueEl=document.getElementById('r-due');dueEl.value=M.due;dueEl.min=nowMin;
   // Team auto-assign section (round-robin)
   const teams=[...new Set(DB.users().flatMap(u=>uTeams(u)))].filter(t=>DUTY[t]?.users?.length);
@@ -1103,7 +1106,7 @@ function exportXLSX(){
   if(!rows.length){showToast('No data to export','⚠️');return}
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);
   const colW=[{wch:18},{wch:28},{wch:22},{wch:26},{wch:10},{wch:12},{wch:16},{wch:12},{wch:16},{wch:12},{wch:20},{wch:40},{wch:30},{wch:18},{wch:18},{wch:18},{wch:60}];ws['!cols']=colW;
-  XLSX.utils.book_append_sheet(wb,ws,'Escalations');XLSX.writeFile(wb,`escalations_${new Date().toISOString().slice(0,10)}.xlsx`);showToast('Excel downloaded ✓');
+  XLSX.utils.book_append_sheet(wb,ws,'Escalations');XLSX.writeFile(wb,`escalations_${localDate()}.xlsx`);showToast('Excel downloaded ✓');
 }
 
 // ── ADMIN PANEL ──
@@ -1342,14 +1345,19 @@ function renderNotifPanel(){
   const unread=mine.filter(n=>!n.read), read=mine.filter(n=>n.read);
   const body=document.getElementById('notif-body');
   const NB={in:'#eff6ff',my:'#f0fdf4'},NR={in:'#93c5fd',my:'#86efac'},ND={in:'#2563eb',my:'#059669'};
-  const row=(n,showBtn)=>`<div style="padding:12px 16px;border-bottom:1px solid var(--g100);background:${showBtn?(NB[n.type]||'#fff'):'#fff'};border-left:3px solid ${showBtn?(NR[n.type]||'var(--g200)'):'var(--g100)'}">
+  const row=(n,showBtn)=>{
+    const esc=DB.escs().find(x=>x.id===n.escId);
+    const canDispute=esc&&esc.status==='closed'&&esc.raisedBy===CU.id;
+    return `<div style="padding:12px 16px;border-bottom:1px solid var(--g100);background:${showBtn?(NB[n.type]||'#fff'):'#fff'};border-left:3px solid ${showBtn?(NR[n.type]||'var(--g200)'):'var(--g100)'}">
     <div style="font-size:10px;font-weight:700;color:${showBtn?(ND[n.type]||'var(--g500)'):'var(--g400)'};text-transform:uppercase;margin-bottom:3px">${n.type==='in'?'📥 Incoming':'📤 Your Request'}</div>
     <div style="font-size:13px;color:${showBtn?'var(--g800)':'var(--g400)'};line-height:1.5">${n.text}</div>
     <div style="font-size:11px;color:var(--g400);margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${timeAgo(n.time)}
       <button class="btn btn-o btn-sm" style="font-size:11px;padding:3px 8px" onclick="closeM('m-notif');openDetail('${n.escId}')">View →</button>
+      ${canDispute?`<button class="btn btn-y btn-sm" style="font-size:11px;padding:3px 8px" onclick="notifDispute('${n.escId}')">⚠️ Raise Dispute</button>`:''}
       ${showBtn?`<button class="btn btn-p btn-sm" style="font-size:11px;padding:3px 8px" onclick="markNotifRead('${n.id}')">✓ Mark as Read</button>`:''}
     </div>
   </div>`;
+  };
   if(!mine.length){body.innerHTML=`<div class="empty" style="padding:36px"><div class="ei">🔕</div><div class="em">No notifications</div></div>`;return}
   let html='';
   if(unread.length){
@@ -1365,6 +1373,7 @@ function renderNotifPanel(){
   }
   body.innerHTML=html;
 }
+function notifDispute(escId){closeM('m-notif');openDetail(escId);setTimeout(()=>raiseDispute(escId),200);}
 function markNotifRead(id){
   const all=DB.notifs(),n=all.find(x=>x.id===id);
   if(!n)return;
@@ -1466,7 +1475,7 @@ function pager(list,key){
 // ── #1 AUTO DUE DATE FROM PRIORITY ──
 function onRPriPick(pri){
   const h={Urgent:.5,High:2,Medium:6,Low:10};
-  if(h[pri]){M.due=new Date(Date.now()+h[pri]*3600000).toISOString().slice(0,16);document.getElementById('r-due').value=M.due}
+  if(h[pri]){M.due=localISO(new Date(Date.now()+h[pri]*3600000));document.getElementById('r-due').value=M.due}
 }
 
 // ── #2 FOLLOW-UP FLAG ──
@@ -1479,15 +1488,25 @@ function setFollowUp(id,flag){
 
 // ── #3 DISPUTE FEATURE ──
 function raiseDispute(id){
-  if(!confirm('Raise a dispute? This will reopen the request and assign to the TL of the assignee.'))return;
+  showRmk('Reason for dispute (required)',r=>doRaiseDispute(id,r),true);
+}
+function doRaiseDispute(id,rmk){
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   const au=getU(e.assignedTo);
   const tl=DB.users().find(u=>u.id===au.reportsTo&&RA[u.role]>=2)
     ||DB.users().find(u=>RA[u.role]===2&&uTeams(u).some(t=>uTeams(au).includes(t)));
   const newA=tl?.id||e.assignedTo;
+  // Find who closed it and their manager
+  const closedByAct=e.activity.slice().reverse().find(a=>a.text?.startsWith('Closed'));
+  const closedBy=closedByAct?.user;
+  const closedByMgr=closedBy?DB.users().find(u=>u.id===getU(closedBy)?.reportsTo&&RA[u.role]>=3)
+    ||DB.users().find(u=>RA[u.role]>=3&&uTeams(u).some(t=>uTeams(getU(closedBy)).includes(t))):null;
   e.status='disputed';e.assignedTo=newA;e.updatedAt=new Date().toISOString();
-  e.activity.push({user:CU.id,text:`⚠️ Dispute raised. Reassigned to ${dN(newA)} for review.`,time:new Date().toISOString()});
-  DB.saveE(es);addNotif(newA,id,`⚠️ Dispute raised on ${id} by ${CU.nick||CU.name}`,'in');
+  e.activity.push({user:CU.id,text:`⚠️ Dispute raised. Reason: "${rmk}". Reassigned to ${dN(newA)} for review.`,time:new Date().toISOString()});
+  DB.saveE(es);
+  addNotif(newA,id,`⚠️ Dispute raised on ${id} by ${CU.nick||CU.name}: "${rmk}"`,'in');
+  if(closedBy&&closedBy!==newA)addNotif(closedBy,id,`⚠️ ${CU.nick||CU.name} raised a dispute on ${id} that you closed: "${rmk}"`,'in');
+  if(closedByMgr)addNotif(closedByMgr.id,id,`⚠️ Dispute on ${id}: ${CU.nick||CU.name} disputed ${dN(closedBy)}'s closure — "${rmk}"`,'in');
   if(e.raisedBy!==CU.id)addNotif(e.raisedBy,id,`Your dispute on ${id} has been raised`,'my');
   closeM('m-detail');showToast('⚠️ Dispute raised');bcast('r');bcast('n');navigate('disputed');buildSidebar();
 }
@@ -1498,9 +1517,14 @@ async function loadDuty(){
   const{data}=await sb.from('duty').select('*');
   if(data)data.forEach(d=>{DUTY[d.id]={users:d.userIds||[],idx:d.rotaIdx||0,date:d.date||'',rr:d.rr||false}});
 }
-async function saveDuty(team){
+async function saveDuty(team,showResult=false){
   const d=DUTY[team]||{users:[],idx:0,date:'',rr:false};
-  await sb.from('duty').upsert({id:team,userIds:d.users,rotaIdx:d.idx,date:d.date,rr:d.rr||false});
+  const{error}=await sb.from('duty').upsert({id:team,userIds:d.users,rotaIdx:d.idx,date:d.date,rr:d.rr||false});
+  if(showResult){
+    if(error)showToast(`❌ Roster not saved: ${error.message}`,'⚠️');
+    else showToast(`✅ ${team} roster saved successfully`);
+  }
+  return !error;
 }
 function getNextDutyAgent(team){
   const d=DUTY[team];if(!d||!d.users.length)return null;
@@ -1508,17 +1532,16 @@ function getNextDutyAgent(team){
   d.idx=(d.idx+1)%d.users.length;
   saveDuty(team);return uid;
 }
-function toggleRR(team){
+async function toggleRR(team){
   if(!DUTY[team])DUTY[team]={users:[],idx:0,date:'',rr:false};
   DUTY[team].rr=!DUTY[team].rr;
-  saveDuty(team);
-  document.getElementById('main').innerHTML=renderDutyPage();
-  showToast(DUTY[team].rr?`🔄 Round Robin ON for ${team}`:`Round Robin OFF for ${team}`);
+  const ok=await saveDuty(team,true);
+  if(ok)document.getElementById('main').innerHTML=renderDutyPage();
 }
 function renderDutyPage(){
   if(!isTeam())return`<div class="ph"><div class="ptitle">🗓 Duty Roster</div></div><div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Team leads only</div></div></div>`;
   const st=mySubtree(),myTeams=[...new Set(DB.users().filter(u=>st.includes(u.id)).flatMap(u=>uTeams(u)))];
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   let h=`<div class="ph"><div><div class="ptitle">🗓 Today's Duty Roster</div><div class="psub">Manage team rotation and leave</div></div></div>`;
   myTeams.forEach(team=>{
     const members=DB.users().filter(u=>uTeams(u).includes(team)&&st.includes(u.id));
@@ -1562,11 +1585,11 @@ function renderDutyPage(){
   return h;
 }
 function saveTeamDuty(team){
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const boxes=[...document.querySelectorAll(`input[data-team="${team}"]`)];
   const users=boxes.filter(b=>b.checked).map(b=>b.dataset.uid);
   DUTY[team]={users,idx:DUTY[team]?.idx||0,date:today,rr:DUTY[team]?.rr||false};
-  saveDuty(team);showToast(`${team} roster saved (${users.length} agents) ✓`);
+  saveDuty(team,true); // showResult=true shows success/failure popup
   document.getElementById('main').innerHTML=renderDutyPage();
 }
 
@@ -1577,9 +1600,10 @@ async function toggleLeave(uid,returnDate){
   u.onLeave=goingOnLeave;
   u.leaveUntil=goingOnLeave?(returnDate||''):'';
   C.users=all;
-  await sb.from('users').update({onLeave:u.onLeave,leaveUntil:u.leaveUntil}).eq('id',uid);
+  const{error}=await sb.from('users').update({onLeave:u.onLeave,leaveUntil:u.leaveUntil}).eq('id',uid);
+  if(error){showToast(`❌ Leave not saved: ${error.message}`,'⚠️');return;}
   if(!goingOnLeave)await returnFromLeave(uid);
-  showToast(goingOnLeave?`${u.nick||u.name} marked on leave`:`${u.nick||u.name} back on duty`);
+  showToast(goingOnLeave?`✅ ${u.nick||u.name} marked on leave`:`✅ ${u.nick||u.name} back on duty`);
   document.getElementById('main').innerHTML=renderDutyPage();
 }
 async function markLeaveWithDate(uid){
@@ -1748,7 +1772,7 @@ async function loadTodos(){
 async function goTodo(){await loadTodos();CP='todo';document.getElementById('main').innerHTML=renderTodo();buildSidebar()}
 
 function renderTodo(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const subjects=CT.filter(t=>t.type==='subject');
   const allItems=CT.filter(t=>t.type==='item');
   const totalItems=allItems.length,doneItems=allItems.filter(t=>t.done).length;
@@ -1861,7 +1885,7 @@ function exportTodos(){
   if(!rows.length){showToast('Nothing to export','⚠️');return}
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:28},{wch:40},{wch:10},{wch:14},{wch:14}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'To-Do');
-  XLSX.writeFile(wb,`todo_${CU.nick||CU.name}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb,`todo_${CU.nick||CU.name}_${localDate()}.xlsx`);
 }
 
 // Debounced text-search: updates state immediately, re-renders after pause, restores focus
