@@ -823,7 +823,8 @@ function openRaiseModal(){
   document.getElementById('ms-category-slot').innerHTML=mkMS('cat',['',...catKeys],['— Select —',...catKeys],'onRCatPick');
   document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',[''],['— Select category first —']);
   document.getElementById('ms-priority-slot').innerHTML=mkMS('priority',['','Urgent','High','Medium','Low'],['— Select —','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'],'onRPriPick');
-  document.getElementById('r-due').value=M.due;
+  const nowMin=new Date(Date.now()-60000).toISOString().slice(0,16); // 1-min grace
+  const dueEl=document.getElementById('r-due');dueEl.value=M.due;dueEl.min=nowMin;
   // Team auto-assign section (round-robin)
   const teams=[...new Set(DB.users().flatMap(u=>uTeams(u)))].filter(t=>DUTY[t]?.users?.length);
   const taSlot=document.getElementById('r-team-slot');
@@ -841,6 +842,7 @@ function submitEsc(){
   const desc=document.getElementById('r-desc').value.trim();
   const [aToRaw,co,cat,sub,pri]=[M.assign,M.company,M.cat,M.subcat,M.priority];
   if(!aToRaw||!co||!cat||!sub||!pri||!due||!desc){showToast('Fill all fields','⚠️');return}
+  if(new Date(due)<new Date(Date.now()-60000)){showToast('Due date cannot be in the past','⚠️');return}
   // Resolve RR team → actual agent via round-robin
   let aTo,leaveRedirect=null;
   if(aToRaw.startsWith('rr:')){
