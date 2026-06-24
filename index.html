@@ -96,7 +96,7 @@ a{cursor:pointer}
 .s-hdr-arrow{font-size:10px;color:var(--g500);transition:transform .2s}
 .s-hdr-arrow.open{transform:rotate(90deg)}
 .s-items{overflow:hidden;transition:max-height .22s ease}
-.ni{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sbt);margin-bottom:1px;cursor:pointer;transition:all .12s;white-space:nowrap;overflow:hidden}
+.ni{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sbt);margin-bottom:1px;cursor:pointer;transition:all .12s;white-space:nowrap;overflow:hidden;min-height:34px;box-sizing:border-box}
 .ni:hover{background:rgba(0,0,0,.05);color:var(--sbh)}
 .ni.active{background:var(--sba);color:var(--sbac);font-weight:600}
 .ni .ico{font-size:15px;width:20px;text-align:center;flex-shrink:0}
@@ -278,6 +278,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--g50)}
 <div class="mo" id="m-raise"><div class="md">
   <div class="mh"><span class="mt">🚨 Raise Escalation</span><button class="mc2" onclick="closeM('m-raise')">✕</button></div>
   <div class="mb"><div class="fgrid">
+    <div class="fgroup full"><label>Auto-Assign by Team (Round-Robin)</label><div id="r-team-slot"></div></div>
     <div class="fgroup full"><label>Assign To *</label><div id="ms-assign-slot"></div></div>
     <div class="fgroup full"><label>Company *</label><div id="ms-company-slot"></div></div>
     <div class="fgroup"><label>Category *</label><div id="ms-category-slot"></div></div>
@@ -354,7 +355,7 @@ function applyTheme(name,save=true){
 applyTheme(CUR_THEME,false);
 
 // ── ROLE SYSTEM ──
-const RA={agent:1,senior_agent:1,account_manager:2,tl:2,manager:3,admin:3,senior_mgmt:4};
+const RA={agent:1,senior_agent:1,account_manager:1,tl:2,manager:3,admin:3,senior_mgmt:4};
 const RLBL={agent:'Agent',senior_agent:'Agent',account_manager:'Team Lead',tl:'Team Lead',manager:'Manager',admin:'Manager',senior_mgmt:'Senior Management'};
 // 4 clean roles for new users
 const ROLES4={agent:'Agent',tl:'Team Lead',manager:'Manager',senior_mgmt:'Senior Management'};
@@ -501,7 +502,7 @@ function av(uid,sz=28){
 }
 const timeAgo=iso=>{const d=Date.now()-new Date(iso);if(d<60000)return 'just now';if(d<3600000)return Math.floor(d/60000)+'m ago';if(d<86400000)return Math.floor(d/3600000)+'h ago';return Math.floor(d/86400000)+'d ago'};
 function fmtDue(iso){if(!iso)return '—';const d=new Date(iso),diff=d-new Date();const lbl=d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});if(diff<0)return `<span class="overdue">⚠ ${lbl}</span>`;if(diff<7200000)return `<span class="due-soon">⏰ ${lbl}</span>`;return lbl}
-const sbadge=s=>{const m={pending:'b-pending',processing:'b-processing',onhold:'b-onhold',closed:'b-closed'};return `<span class="badge ${m[s]||''}">${{pending:'⏳ Pending',processing:'🔄 Processing',onhold:'⏸ On Hold',closed:'✅ Closed'}[s]||s}</span>`};
+const sbadge=s=>{const m={pending:'b-pending',processing:'b-processing',onhold:'b-onhold',closed:'b-closed',disputed:'b-urgent'};const lbl={pending:'⏳ Pending',processing:'🔄 Processing',onhold:'⏸ On Hold',closed:'✅ Closed',disputed:'⚠️ Disputed'};return `<span class="badge ${m[s]||''}">${lbl[s]||s}</span>`};
 const pbadge=p=>{const m={Urgent:'b-urgent',High:'b-high',Medium:'b-medium',Low:'b-low'};return `<span class="badge ${m[p]||''}">${p||'—'}</span>`};
 function addNotif(forU,escId,text,type='in'){const n={id:'n'+Date.now(),forUser:forU,escId,text,time:new Date().toISOString(),read:false,type};C.notifs.unshift(n);sb.from('notifications').insert(n).then(r=>r.error&&console.error('addNotif',r.error))}
 const sc=(label,icon,val,color,desc,page)=>`<div class="sc ${color}" onclick="navigate('${page}')"><div class="slabel">${icon} ${label}</div><div class="sval">${val}</div><div class="sdesc">${desc}</div></div>`;
@@ -527,6 +528,7 @@ function fBar(){
     ${mkMSS('team',['',...teams],['All Teams',...teams])}
     ${mkMSS('rby',['',...users.map(u=>u.id)],['Raised By',...users.map(u=>u.nick||u.name)])}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)])}
+    ${mkMSS('fu',['','yes','disp'],['All','🚩 Follow-up','⚠️ Disputed'])}
     <button class="btn btn-o btn-sm" onclick="F={};refreshView()">✕ Clear</button>
   </div>`;
 }
@@ -539,6 +541,8 @@ function applyF(list){return list.filter(e=>{
   if(F.team?.length&&!F.team.some(t=>uTeams(getU(e.raisedBy)).includes(t)||uTeams(getU(e.assignedTo)).includes(t)))return false;
   if(F.rby?.length&&!F.rby.includes(e.raisedBy))return false;
   if(F.uid?.length&&!F.uid.includes(e.assignedTo))return false;
+  if(F.fu?.includes('yes')&&!e.followUp)return false;
+  if(F.fu?.includes('disp')&&e.status!=='disputed')return false;
   if(F.from&&new Date(e.updatedAt)<new Date(F.from))return false;
   if(F.to&&new Date(e.updatedAt)>new Date(F.to+'T23:59:59'))return false;
   return true})}
@@ -585,7 +589,7 @@ async function doLogin(){
     DB.setSess(u.id);startSess(u);
   }catch(e){console.error(e);showErr('Connection error. Check your internet and try again.');}
 }
-function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm()}
+function startSess(u){CU=u;document.getElementById('login').style.display='none';const ap=document.getElementById('app');ap.style.display='flex';ap.classList.add('v');renderTopbar();buildSidebar();navigate('dashboard');checkDot();startRealtime();requestNotifPerm();loadDuty()}
 function requestNotifPerm(){if(!('Notification' in window))return;if(Notification.permission==='default'){setTimeout(()=>Notification.requestPermission(),2000)}}
 function deskNotif(title,body,escId){if(Notification.permission!=='granted')return;const n=new Notification(title,{body,icon:'https://surya-medvol.github.io/resolve360/favicon.ico',tag:escId||'resolve360'});n.onclick=()=>{window.focus();if(escId)openDetail(escId);n.close()}}
 function renderTopbar(){document.getElementById('t-av').innerHTML=av(CU.id,32);document.getElementById('t-name').textContent=CU.nick||CU.name}
@@ -642,6 +646,8 @@ function buildSidebar(){
   const passMe=cnt(e=>(e.passedThrough||[]).includes(uid)&&e.status!=='closed');
   const rOpen=cnt(e=>e.raisedBy===uid&&e.status!=='closed');
   const allOpen=cnt(e=>e.status!=='closed');
+  const fuCnt=cnt(e=>e.followUp&&['pending','processing','onhold','disputed'].includes(e.status)&&(e.raisedBy===uid||mySubtree().includes(e.assignedTo)));
+  const dispCnt=cnt(e=>e.status==='disputed');
   const st=mySubtree();
   const tActive=cnt(e=>['pending','processing','onhold'].includes(e.status)&&st.includes(e.assignedTo));
   const tRaised=cnt(e=>e.status!=='closed'&&st.includes(e.raisedBy));
@@ -663,6 +669,8 @@ function buildSidebar(){
   h+=sec('myteam','My Team',[ni2r('team-active','🔥','Team Active',tActive),ni2r('team-raised','📤','Team Raised',tRaised)]);
   if(isTeam())h+=sec('team','Team View',[ni2r('team-dashboard','👥','Team Overview',allOpen),ni2('team-pending','📌','Team Pending'),ni2('reports','📈','Reports & Analytics')]);
   if(isFull())h+=sec('mgr',isSenior()?'Senior Mgmt':'Manager',[ni2r('mgr-overview','🏢','All Teams',allOpen),ni2('mgr-agents','👤','Agent-wise'),ni2('admin','⚙️','Admin Panel')]);
+  h+=sec('flags','Flags & Disputes',[ni2r('followup','🚩','Follow-up',fuCnt||''),ni2r('disputed','⚠️','Disputed',dispCnt||'')]);
+  if(isTeam())h+=sec('rota','Duty Roster',[ni2('duty','🗓','Today\'s Roster')]);
   h+=sec('arch','Archive',[ni2('closed','✅','Closed')]);
   document.getElementById('sidebar').innerHTML=h;
   applySbMode();
@@ -723,6 +731,8 @@ function renderList(page){
     'team-raised':{title:'📤 Team Raised',filter:e=>e.status!=='closed'&&st.includes(e.raisedBy),r:true,a:true},
     'team-pending':{title:'📌 Team Pending',filter:e=>st.includes(e.assignedTo)&&e.status!=='closed',r:true,a:true},
     'closed':{title:'✅ Closed',filter:e=>e.status==='closed'},
+    'disputed':{title:'⚠️ Disputed',filter:e=>e.status==='disputed',r:true,a:true},
+    'followup':{title:'🚩 Follow-up Flagged',filter:e=>e.followUp&&e.status!=='closed',r:true,a:true},
   };
   const c=cfg[page]||cfg['raised-all'];const raw=es.filter(c.filter);const list=applyF(raw);
   const dateBar=page==='closed'?`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--g500)">📅 Closed date:</span><input type="date" class="ss-inp" style="width:140px" value="${F.from||''}" onchange="F.from=this.value;refreshView()"><span style="font-size:12px;color:var(--g400)">to</span><input type="date" class="ss-inp" style="width:140px" value="${F.to||''}" onchange="F.to=this.value;refreshView()"></div>`:'';
@@ -772,7 +782,7 @@ function escTable(list,showR=true,showA=true,pgKey=''){
   if(!list.length)return `<div class="card"><div class="empty"><div class="ei">📭</div><div class="em">No escalations here.</div></div></div>`;
   let rows=list,pHtml='';if(pgKey){const {items,html}=pager(list,pgKey);rows=items;pHtml=html}
   return `<div class="card"><div class="tw"><table><thead><tr><th>ID</th><th>Company</th><th>Category</th>${showR?'<th>Raised By</th>':''}${showA?'<th>Assigned To</th>':''}<th>Priority</th><th>Status</th><th>Due</th><th>Age</th><th></th></tr></thead><tbody>${rows.map(e=>`<tr>
-    <td><span class="idc" onclick="openDetail('${e.id}')">${e.id}</span></td>
+    <td><span class="idc" onclick="openDetail('${e.id}')">${e.id}</span>${e.followUp?' <span title="Follow-up flagged">🚩</span>':''}</td>
     <td><div style="font-weight:600;font-size:13px">${e.company||'—'}</div></td>
     <td><div style="font-size:12px;font-weight:600">${e.category||'—'}</div><div style="font-size:11px;color:var(--g400);margin-top:2px">${e.subcategory||''}</div></td>
     ${showR?`<td style="white-space:nowrap">${av(e.raisedBy,20)}<span style="font-size:12px;margin-left:5px">${dN(e.raisedBy)}</span></td>`:''}
@@ -793,8 +803,12 @@ function openRaiseModal(){
   document.getElementById('ms-company-slot').innerHTML=mkMS('company',['',...DB.cos()],['— Select —',...DB.cos()]);
   document.getElementById('ms-category-slot').innerHTML=mkMS('cat',['',...catKeys],['— Select —',...catKeys],'onRCatPick');
   document.getElementById('ms-subcat-slot').innerHTML=mkMS('subcat',[''],['— Select category first —']);
-  document.getElementById('ms-priority-slot').innerHTML=mkMS('priority',['','Urgent','High','Medium','Low'],['— Select —','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low']);
+  document.getElementById('ms-priority-slot').innerHTML=mkMS('priority',['','Urgent','High','Medium','Low'],['— Select —','🔴 Urgent','🟠 High','🟡 Medium','🟢 Low'],'onRPriPick');
   document.getElementById('r-due').value=M.due;
+  // Team auto-assign section (round-robin)
+  const teams=[...new Set(DB.users().flatMap(u=>uTeams(u)))].filter(t=>DUTY[t]?.users?.length);
+  const taSlot=document.getElementById('r-team-slot');
+  if(taSlot)taSlot.innerHTML=teams.length?`<select class="inp" style="width:100%" onchange="autoAssignTeam(this.value)"><option value="">— Manual assignment —</option>${teams.map(t=>`<option value="${t}">${t} (${DUTY[t].users.length} on duty)</option>`).join('')}</select>`:`<div style="font-size:12px;color:var(--g400);padding:6px 0">No duty roster set — TL must set up roster first</div>`;
   document.getElementById('r-desc').value='';
   openM('m-raise');
 }
@@ -806,8 +820,9 @@ function onRCatPick(cat){
 function submitEsc(){
   const due=document.getElementById('r-due').value.trim();
   const desc=document.getElementById('r-desc').value.trim();
-  const [aTo,co,cat,sub,pri]=[M.assign,M.company,M.cat,M.subcat,M.priority];
-  if(!aTo||!co||!cat||!sub||!pri||!due||!desc){showToast('Fill all fields','⚠️');return}
+  const [aToRaw,co,cat,sub,pri]=[M.assign,M.company,M.cat,M.subcat,M.priority];
+  if(!aToRaw||!co||!cat||!sub||!pri||!due||!desc){showToast('Fill all fields','⚠️');return}
+  const aTo=resolveLeaveAssign(aToRaw); // redirect if on leave
   const es=DB.escs();
   const e={id:genId(),company:co,category:cat,subcategory:sub,priority:pri,desc,raisedBy:CU.id,assignedTo:aTo,passedThrough:[],status:'pending',due:new Date(due).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),remarks:'',activity:[{user:CU.id,text:`Raised → assigned to ${dN(aTo)}. Remarks: "${desc}"`,time:new Date().toISOString()}]};
   es.push(e);DB.saveE(es);addNotif(aTo,e.id,`New from ${CU.nick||CU.name}: ${co} — ${sub} [${pri}]`,'in');
@@ -885,7 +900,10 @@ function openDetail(id){
     ${actionHtml}${reassignHtml}${rmkBox}
     ${e.status!=='closed'?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--g100)"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">💬 Add Comment</div><div style="display:flex;gap:8px"><textarea id="cmt-txt" class="rmk-ta" style="flex:1;min-height:60px" placeholder="Visible to all — type your comment…"></textarea><button class="btn btn-p btn-sm" style="align-self:flex-end" onclick="submitComment('${id}')">Post</button></div></div>`:''}
     `;
-  document.getElementById('d-footer').innerHTML=`<button class="btn btn-o" onclick="closeM('m-detail')">Close</button>`;
+  const canFlag=(isR||isTeam())&&['pending','processing','onhold','disputed'].includes(e.status);
+  const footerExtra=(canFlag?(e.followUp?`<button class="btn btn-o btn-sm" onclick="setFollowUp('${id}',false)">✕ Remove Flag</button>`:`<button class="btn btn-y btn-sm" onclick="setFollowUp('${id}',true)">🚩 Flag Follow-up</button>`):'')
+    +(isR&&e.status==='closed'?`<button class="btn btn-y btn-sm" onclick="raiseDispute('${id}')">⚠️ Raise Dispute</button>`:'');
+  document.getElementById('d-footer').innerHTML=`<button class="btn btn-o" onclick="closeM('m-detail')">Close</button><div style="margin-left:auto;display:flex;gap:7px">${footerExtra}</div>`;
   openM('m-detail');
 }
 
@@ -941,7 +959,8 @@ function escalateEsc(id,rmk){
   closeM('m-detail');showToast(`Escalated to ${tgt.name}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 function doReassign(id,rmk){
-  const sel=M.reassign;if(!sel){showToast('Select a person','⚠️');return}
+  const selRaw=M.reassign;if(!selRaw){showToast('Select a person','⚠️');return}
+  const sel=resolveLeaveAssign(selRaw); // redirect if on leave
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
   const oldNm=getU(e.assignedTo).name,nU=getU(sel);
   const pt=e.passedThrough||[];if(!pt.includes(e.assignedTo))pt.push(e.assignedTo);
@@ -1397,6 +1416,119 @@ function pager(list,key){
   return{items,html:`<div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;padding:10px 0;flex-wrap:wrap"><span style="font-size:12px;color:var(--g400)">${total} total</span>${btns}</div>`};
 }
 
+// ── #1 AUTO DUE DATE FROM PRIORITY ──
+function onRPriPick(pri){
+  const h={Urgent:.5,High:2,Medium:6,Low:10};
+  if(h[pri]){M.due=new Date(Date.now()+h[pri]*3600000).toISOString().slice(0,16);document.getElementById('r-due').value=M.due}
+}
+
+// ── #2 FOLLOW-UP FLAG ──
+function setFollowUp(id,flag){
+  const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
+  e.followUp=!!flag;e.followUpAt=flag?new Date().toISOString():'';
+  e.activity.push({user:CU.id,text:flag?'🚩 Flagged for follow-up':'🚩 Follow-up removed',time:new Date().toISOString()});
+  DB.saveE(es);closeM('m-detail');showToast(flag?'🚩 Follow-up flagged':'Flag removed');bcast('r');navigate(CP);
+}
+
+// ── #3 DISPUTE FEATURE ──
+function raiseDispute(id){
+  if(!confirm('Raise a dispute? This will reopen the request and assign to the TL of the assignee.'))return;
+  const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
+  const au=getU(e.assignedTo);
+  const tl=DB.users().find(u=>u.id===au.reportsTo&&RA[u.role]>=2)
+    ||DB.users().find(u=>RA[u.role]===2&&uTeams(u).some(t=>uTeams(au).includes(t)));
+  const newA=tl?.id||e.assignedTo;
+  e.status='disputed';e.assignedTo=newA;e.updatedAt=new Date().toISOString();
+  e.activity.push({user:CU.id,text:`⚠️ Dispute raised. Reassigned to ${dN(newA)} for review.`,time:new Date().toISOString()});
+  DB.saveE(es);addNotif(newA,id,`⚠️ Dispute raised on ${id} by ${CU.nick||CU.name}`,'in');
+  if(e.raisedBy!==CU.id)addNotif(e.raisedBy,id,`Your dispute on ${id} has been raised`,'my');
+  closeM('m-detail');showToast('⚠️ Dispute raised');bcast('r');bcast('n');navigate('disputed');buildSidebar();
+}
+
+// ── #4 ROUND-ROBIN DUTY ROSTER ──
+var DUTY={};// {team:{users:[uid,...],idx:0,date:'YYYY-MM-DD'}}
+async function loadDuty(){
+  const{data}=await sb.from('duty').select('*');
+  if(data)data.forEach(d=>{DUTY[d.id]={users:d.userIds||[],idx:d.rotaIdx||0,date:d.date||''}});
+}
+async function saveDuty(team){
+  const d=DUTY[team]||{users:[],idx:0,date:''};
+  await sb.from('duty').upsert({id:team,userIds:d.users,rotaIdx:d.idx,date:d.date});
+}
+function getNextDutyAgent(team){
+  const d=DUTY[team];if(!d||!d.users.length)return null;
+  const uid=d.users[d.idx%d.users.length];
+  d.idx=(d.idx+1)%d.users.length;
+  saveDuty(team);return uid;
+}
+function autoAssignTeam(team){
+  if(!team){document.getElementById('ms-assign-slot').innerHTML=mkMS('assign',['',...DB.users().filter(u=>u.id!==CU.id).map(u=>u.id)],['— Select —',...DB.users().filter(u=>u.id!==CU.id).map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)]);return}
+  const uid=getNextDutyAgent(team);
+  if(!uid){showToast(`No agents on duty for ${team}`,'⚠️');return}
+  M.assign=uid;
+  const u=getU(uid);
+  document.getElementById('ms-assign-slot').innerHTML=`<div class="ss-inp" style="background:var(--greenl);border-color:var(--green);color:var(--g800)">✅ Auto: ${u.nick||u.name}</div>`;
+}
+function renderDutyPage(){
+  if(!isTeam())return`<div class="ph"><div class="ptitle">🗓 Duty Roster</div></div><div class="card"><div class="empty"><div class="ei">🔒</div><div class="em">Team leads only</div></div></div>`;
+  const st=mySubtree(),myTeams=[...new Set(DB.users().filter(u=>st.includes(u.id)).flatMap(u=>uTeams(u)))];
+  const today=new Date().toISOString().slice(0,10);
+  let h=`<div class="ph"><div><div class="ptitle">🗓 Today's Duty Roster</div><div class="psub">Select who is working today for auto-assignment</div></div></div>`;
+  myTeams.forEach(team=>{
+    const members=DB.users().filter(u=>uTeams(u).includes(team)&&st.includes(u.id));
+    if(!members.length)return;
+    if(!DUTY[team]||DUTY[team].date!==today){DUTY[team]={users:DUTY[team]?.date===today?DUTY[team].users:[],idx:0,date:today}}
+    const onDuty=DUTY[team].users;
+    h+=`<div class="card" style="margin-bottom:12px"><div class="ch"><span class="ct">${team}</span><button class="btn btn-p btn-sm" onclick="saveTeamDuty('${team}')">💾 Save Roster</button></div><div class="cb">`;
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">✅ On Duty Today (check to include in rotation)</div>`;
+    h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:16px">`;
+    members.forEach(u=>{
+      const on=onDuty.includes(u.id)&&!u.onLeave;
+      h+=`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;border:1px solid ${u.onLeave?'var(--red)':on?'var(--green)':'var(--g200)'};background:${u.onLeave?'var(--redl)':on?'var(--greenl)':'#fff'};cursor:${u.onLeave?'default':'pointer'}">
+        <input type="checkbox" ${on?'checked':''} ${u.onLeave?'disabled':''} data-team="${team}" data-uid="${u.id}" style="accent-color:var(--green)">
+        ${av(u.id,24)}<span style="font-size:13px;font-weight:500;flex:1">${u.nick||u.name}</span>
+        ${u.onLeave?'<span style="font-size:10px;color:var(--red);font-weight:700">🏖 LEAVE</span>':''}
+      </label>`;
+    });
+    h+=`</div>`;
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px;padding-top:12px;border-top:1px solid var(--g100)">🏖 Leave Management (toggle who is on leave)</div>`;
+    h+=`<div style="display:flex;flex-wrap:wrap;gap:8px">`;
+    members.forEach(u=>{
+      h+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:6px;border:1px solid ${u.onLeave?'var(--red)':'var(--g200)'};background:${u.onLeave?'var(--redl)':'#fff'}">
+        ${av(u.id,22)}<span style="font-size:13px;font-weight:500">${u.nick||u.name}</span>
+        <button class="btn btn-sm" style="background:${u.onLeave?'var(--green)':'var(--red)'};color:#fff;font-size:11px;padding:3px 9px" onclick="toggleLeave('${u.id}')">${u.onLeave?'✓ Back on Duty':'🏖 Mark Leave'}</button>
+      </div>`;
+    });
+    h+=`</div></div></div>`;
+  });
+  return h;
+}
+function saveTeamDuty(team){
+  const today=new Date().toISOString().slice(0,10);
+  const boxes=[...document.querySelectorAll(`input[data-team="${team}"]`)];
+  const users=boxes.filter(b=>b.checked).map(b=>b.dataset.uid);
+  DUTY[team]={users,idx:DUTY[team]?.idx||0,date:today};
+  saveDuty(team);showToast(`${team} roster saved (${users.length} on duty) ✓`);
+  document.getElementById('main').innerHTML=renderDutyPage();
+}
+
+// ── #5 LEAVE MANAGEMENT ──
+async function toggleLeave(uid){
+  const all=DB.users(),u=all.find(x=>x.id===uid);if(!u)return;
+  u.onLeave=!u.onLeave;
+  C.users=all;await sb.from('users').update({onLeave:u.onLeave}).eq('id',uid);
+  showToast(u.onLeave?`${u.nick||u.name} marked on leave`:`${u.nick||u.name} back on duty`);
+  document.getElementById('main').innerHTML=renderDutyPage();
+}
+function resolveLeaveAssign(uid){
+  // If assigned user is on leave, return their TL; else return the uid
+  const u=getU(uid);if(!u.onLeave)return uid;
+  const tl=DB.users().find(x=>x.id===u.reportsTo&&RA[x.role]>=2)
+    ||DB.users().find(x=>RA[x.role]===2&&uTeams(x).some(t=>uTeams(u).includes(t)));
+  if(tl){showToast(`${u.nick||u.name} is on leave — redirected to ${tl.nick||tl.name} 🔀`,'ℹ️');return tl.id}
+  return uid;
+}
+
 // ── SEARCHABLE SELECT ──
 var _ssCb={};  // optional per-id pick callbacks
 function mkSS(key,vals,lbls,ns='F',cb=''){
@@ -1655,6 +1787,7 @@ function refreshView(){
     'team-pending':()=>renderList('team-pending'),closed:()=>renderList('closed'),
     'team-dashboard':renderTeamDash,'mgr-overview':renderMgrOverview,'mgr-agents':renderMgrAgents,
     reports:renderReports,admin:renderAdmin,todo:renderTodo,search:renderSearch,
+    disputed:()=>renderList('disputed'),followup:()=>renderList('followup'),duty:renderDutyPage,
   };
   const fn=views[CP];
   if(fn){document.getElementById('main').innerHTML=fn();if(CP==='reports')setTimeout(initCharts,50)}
