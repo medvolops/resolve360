@@ -560,6 +560,10 @@ function fBar(){
     ${mkMSS('rby',['',...users.map(u=>u.id)],['Raised By',...users.map(u=>u.nick||u.name)])}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)])}
     ${mkMSS('fu',['','yes','disp'],['All','🚩 Follow-up','⚠️ Disputed'])}
+    <span style="font-size:11px;font-weight:600;color:var(--g500);white-space:nowrap">📅 From</span>
+    <input type="date" class="ss-inp" style="width:130px" value="${F.from||''}" onchange="F.from=this.value;PAGE={};refreshView()">
+    <span style="font-size:11px;color:var(--g400)">→</span>
+    <input type="date" class="ss-inp" style="width:130px" value="${F.to||''}" onchange="F.to=this.value;PAGE={};refreshView()">
     <button class="btn btn-o btn-sm" onclick="F={};refreshView()">✕ Clear</button>
   </div>`;
 }
@@ -574,8 +578,8 @@ function applyF(list){return list.filter(e=>{
   if(F.uid?.length&&!F.uid.includes(e.assignedTo))return false;
   if(F.fu?.includes('yes')&&!e.followUp)return false;
   if(F.fu?.includes('disp')&&e.status!=='disputed')return false;
-  if(F.from&&new Date(e.updatedAt)<new Date(F.from))return false;
-  if(F.to&&new Date(e.updatedAt)>new Date(F.to+'T23:59:59'))return false;
+  if(F.from&&new Date(e.createdAt)<new Date(F.from))return false;
+  if(F.to&&new Date(e.createdAt)>new Date(F.to+'T23:59:59'))return false;
   return true})}
 
 // Dashboard filter
@@ -588,6 +592,10 @@ function dashFBar(){
     ${mkMSS('cat',['',...cats],['Category',...cats],'DF')}
     ${mkMSS('co',['',...cos],['Company',...cos],'DF')}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)],'DF')}
+    <span style="font-size:11px;font-weight:600;color:var(--g500);white-space:nowrap">📅 From</span>
+    <input type="date" class="ss-inp" style="width:130px" value="${DF.from||''}" onchange="DF.from=this.value;refreshView()">
+    <span style="font-size:11px;color:var(--g400)">→</span>
+    <input type="date" class="ss-inp" style="width:130px" value="${DF.to||''}" onchange="DF.to=this.value;refreshView()">
     <button class="btn btn-o btn-sm" onclick="DF={};refreshView()">✕ Clear</button>
   </div>`;
 }
@@ -599,6 +607,8 @@ function applyDF(list){return list.filter(e=>{
   if(DF.cat?.length&&!DF.cat.includes(e.category))return false;
   if(DF.co?.length&&!DF.co.includes(e.company))return false;
   if(DF.uid?.length&&!DF.uid.includes(e.assignedTo))return false;
+  if(DF.from&&new Date(e.createdAt)<new Date(DF.from))return false;
+  if(DF.to&&new Date(e.createdAt)>new Date(DF.to+'T23:59:59'))return false;
   return true})}
 
 // ── REMARKS ──
@@ -818,7 +828,11 @@ function showMsg(m){const e=document.getElementById('lmsg');e.textContent=m;e.st
 // ── SIDEBAR ──
 var _sbSec='work'; // active section icon
 var _sbCounts={}; // previous counts for bounce detection
-function showSbSec(sec){_sbSec=sec;buildSidebar();}
+function showSbSec(sec){
+  _sbSec=sec;
+  const def={work:'dashboard',team:'team-active',flags:'followup',roster:'duty',mgr:'mgr-overview'};
+  if(def[sec])navigate(def[sec]);else buildSidebar();
+}
 // ── SIDEBAR PIN STATE ──
 let sbPinned=localStorage.getItem('et_sbp')!=='0'; // default: pinned open; collapses only if user explicitly hid it
 function applySbMode(){
@@ -957,8 +971,7 @@ function renderList(page){
     'leave-review':{title:'🏖 Leave Review',filter:e=>e.status!=='closed'&&e.activity?.some(a=>a.text?.startsWith('🔍 LEAVE_REVIEW'))&&inMyScope(e),r:true,a:true},
   };
   const c=cfg[page]||cfg['raised-all'];const raw=es.filter(c.filter);const list=applyF(raw);
-  const dateBar=page==='closed'?`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--g500)">📅 Closed date:</span><input type="date" class="ss-inp" style="width:140px" value="${F.from||''}" onchange="F.from=this.value;refreshView()"><span style="font-size:12px;color:var(--g400)">to</span><input type="date" class="ss-inp" style="width:140px" value="${F.to||''}" onchange="F.to=this.value;refreshView()"></div>`:'';
-  return `<div class="ph"><div><div class="ptitle">${c.title}</div><div class="psub">${list.length} of ${raw.length} results</div></div></div>`+dateBar+fBar()+(list.length===0?`<div class="card"><div class="empty"><div class="ei">📭</div><div class="em">No results.</div></div></div>`:escTable(list,c.r,c.a,page));
+  return `<div class="ph"><div><div class="ptitle">${c.title}</div><div class="psub">${list.length} of ${raw.length} results</div></div></div>`+fBar()+(list.length===0?`<div class="card"><div class="empty"><div class="ei">📭</div><div class="em">No results.</div></div></div>`:escTable(list,c.r,c.a,page));
 }
 
 // ── TEAM / MGR VIEWS ──
