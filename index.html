@@ -559,7 +559,6 @@ function fBar(){
     ${mkMSS('team',['',...teams],['All Teams',...teams])}
     ${mkMSS('rby',['',...users.map(u=>u.id)],['Raised By',...users.map(u=>u.nick||u.name)])}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)])}
-    ${mkMSS('fu',['','yes','disp'],['All','🚩 Follow-up','⚠️ Disputed'])}
     <span style="font-size:11px;font-weight:600;color:var(--g500);white-space:nowrap">📅 From</span>
     <input type="date" class="ss-inp" style="width:130px" value="${F.from||''}" onchange="F.from=this.value;PAGE={};refreshView()">
     <span style="font-size:11px;color:var(--g400)">→</span>
@@ -576,8 +575,6 @@ function applyF(list){return list.filter(e=>{
   if(F.team?.length&&!F.team.some(t=>uTeams(getU(e.raisedBy)).includes(t)||uTeams(getU(e.assignedTo)).includes(t)))return false;
   if(F.rby?.length&&!F.rby.includes(e.raisedBy))return false;
   if(F.uid?.length&&!F.uid.includes(e.assignedTo))return false;
-  if(F.fu?.includes('yes')&&!e.followUp)return false;
-  if(F.fu?.includes('disp')&&e.status!=='disputed')return false;
   if(F.from&&new Date(e.createdAt)<new Date(F.from))return false;
   if(F.to&&new Date(e.createdAt)>new Date(F.to+'T23:59:59'))return false;
   return true})}
