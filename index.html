@@ -542,6 +542,7 @@ const sc=(label,icon,val,color,desc,page)=>`<div class="sc ${color}" onclick="na
 
 // ── STATE ──
 let CU=null,CP='dashboard',_pa=null,adminTab='users',catTab='',PAGE={},sC={};
+var adminQ='',_faultTag='';
 var F={},DF={},RF={};
 
 // ── PAGINATION ──
@@ -613,9 +614,38 @@ function applyDF(list){return list.filter(e=>{
   return true})}
 
 // ── REMARKS ──
-function showRmk(title,fn,req=false){_pa={fn,req};document.getElementById('rmk-lbl').textContent=title;document.getElementById('rmk-txt').value='';document.getElementById('rmk-box').style.display='block';const ab=document.getElementById('act-btns');if(ab)ab.style.display='none';document.getElementById('rmk-txt').focus()}
-function cancelRmk(){document.getElementById('rmk-box').style.display='none';const ab=document.getElementById('act-btns');if(ab)ab.style.display='flex';_pa=null}
-function doRmk(){const r=document.getElementById('rmk-txt').value.trim();if(_pa?.req&&!r){showToast('Remarks required','⚠️');return}const fn=_pa?.fn;_pa=null;if(fn)fn(r)}
+function showRmk(title,fn,req=false,showTag=false){
+  _pa={fn,req};
+  document.getElementById('rmk-lbl').textContent=title;
+  document.getElementById('rmk-txt').value='';
+  document.getElementById('rmk-box').style.display='block';
+  const fw=document.getElementById('rmk-fault-wrap');
+  if(fw){
+    fw.style.display=showTag?'block':'none';
+    if(showTag){
+      const chk=document.getElementById('rmk-fault-chk');if(chk)chk.checked=false;
+      const pick=document.getElementById('rmk-fault-pick');if(pick)pick.style.display='none';
+      _faultTag='';
+    }
+  }
+  const ab=document.getElementById('act-btns');if(ab)ab.style.display='none';
+  document.getElementById('rmk-txt').focus();
+}
+function cancelRmk(){document.getElementById('rmk-box').style.display='none';const ab=document.getElementById('act-btns');if(ab)ab.style.display='flex';_pa=null;_faultTag=''}
+function doRmk(){
+  const r=document.getElementById('rmk-txt').value.trim();
+  if(_pa?.req&&!r){showToast('Remarks required','⚠️');return}
+  _faultTag=document.getElementById('fault-tag-sel')?.value||'';
+  const fn=_pa?.fn;_pa=null;if(fn)fn(r);
+}
+function toggleFaultTag(checked){
+  const pick=document.getElementById('rmk-fault-pick');if(!pick)return;
+  if(!checked){pick.style.display='none';return}
+  const pool=DB.users().filter(u=>u.id!==CU.id&&uTeams(u).some(t=>uTeams(CU).includes(t)));
+  const sel=document.getElementById('fault-tag-sel');
+  if(sel)sel.innerHTML=`<option value="">— Select person —</option>`+pool.map(u=>`<option value="${u.id}">${u.nick||u.name} (${RLBL[u.role]||u.role})</option>`).join('');
+  pick.style.display='block';
+}
 
 // ── AUTH ──
 async function doLogin(){
@@ -1135,7 +1165,7 @@ function openDetail(id){
     if(e.status==='pending')btns.push(`<button class="btn btn-p btn-sm" onclick="showRmk('▶ Start Processing',r=>updateStatus('${id}','processing',r))">▶ Start</button>`);
     if(e.status==='processing')btns.push(`<button class="btn btn-y btn-sm" onclick="showRmk('⏸ Put On Hold',r=>updateStatus('${id}','onhold',r))">⏸ Hold</button>`);
     if(e.status==='onhold')btns.push(`<button class="btn btn-p btn-sm" onclick="showRmk('▶ Resume',r=>updateStatus('${id}','processing',r))">▶ Resume</button>`);
-    btns.push(`<button class="btn btn-g btn-sm" onclick="showRmk('✅ Close — Resolution',r=>resolveEsc('${id}',r),true)">✅ Close</button>`);
+    btns.push(`<button class="btn btn-g btn-sm" onclick="showRmk('✅ Close — Resolution',r=>resolveEsc('${id}',r),true,true)">✅ Close</button>`);
     if(myAcc()===1){const rto=CU.reportsTo?getU(CU.reportsTo):null;const lbl=rto&&rto.name!=='Unknown'?`🔺 Escalate to ${rto.nick||rto.name}`:'🔺 Escalate';btns.push(`<button class="btn btn-y btn-sm" onclick="showRmk('${lbl}',r=>escalateEsc('${id}',r))">${lbl}</button>`)}
     if(myAcc()===2){const rto=CU.reportsTo?getU(CU.reportsTo):null;const lbl=rto&&rto.name!=='Unknown'?`🔺 Escalate to ${rto.nick||rto.name}`:'🔺 Escalate to Manager';btns.push(`<button class="btn btn-r btn-sm" onclick="showRmk('${lbl}',r=>escalateEsc('${id}',r))">${lbl}</button>`)}
     actionHtml=`<div style="margin-top:14px;border-top:1px solid var(--g100);padding-top:12px"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:9px">Actions</div><div id="act-btns" style="display:flex;gap:7px;flex-wrap:wrap">${btns.join('')}</div></div>`;
@@ -1164,7 +1194,7 @@ function openDetail(id){
   // AM-specific: route/change-assign panel (shown for isR or isA when role=account_manager)
   let amHtml='';
   if(isAM&&e.status!=='closed'&&(isA||isR)){
-    const agentPool=DB.users().filter(u=>['agent','senior_agent'].includes(u.role)&&u.id!==e.assignedTo);
+    const agentPool=DB.users().filter(u=>u.id!==e.assignedTo&&u.id!==CU.id);
     M.amroute='';
     const amLbl=isA?'🔄 Route to Agent':'🔄 Change Assignment';
     const amFn=isA?`doAMRoute('${id}',r)`:`doAMChangeAssign('${id}',r)`;
@@ -1179,7 +1209,12 @@ function openDetail(id){
     </div>`;
   }
 
-  const rmkBox=`<div id="rmk-box" class="rmk-box" style="display:none"><label id="rmk-lbl"></label><textarea id="rmk-txt" class="rmk-ta" placeholder="Add remarks…"></textarea><div style="margin-top:8px;display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="doRmk()">✓ Confirm</button><button class="btn btn-o btn-sm" onclick="cancelRmk()">Cancel</button></div></div>`;
+  const rmkBox=`<div id="rmk-box" class="rmk-box" style="display:none"><label id="rmk-lbl"></label><textarea id="rmk-txt" class="rmk-ta" placeholder="Add remarks…"></textarea>
+    <div id="rmk-fault-wrap" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--g200)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--g600)"><input type="checkbox" id="rmk-fault-chk" onchange="toggleFaultTag(this.checked)"> 📌 Tag responsible person</label>
+      <div id="rmk-fault-pick" style="display:none;margin-top:8px"><select id="fault-tag-sel" class="inp" style="width:100%"><option value="">— Select person —</option></select></div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="doRmk()">✓ Confirm</button><button class="btn btn-o btn-sm" onclick="cancelRmk()">Cancel</button></div></div>`;
 
   document.getElementById('d-title').innerHTML=`<span class="idc" style="cursor:default">${e.id}</span> &nbsp;${e.subcategory||e.category}`;
   document.getElementById('d-body').innerHTML=`${stepper}
@@ -1190,7 +1225,7 @@ function openDetail(id){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div><div class="dr"><span class="dl">Priority</span><span class="dv">${pbadge(e.priority)}</span></div><div class="dr"><span class="dl">Due</span><span class="dv">${fmtDue(e.due)}</span></div><div class="dr"><span class="dl">Raised</span><span class="dv">${timeAgo(e.createdAt)}</span></div></div>
-      <div><div class="dr"><span class="dl">Status</span><span class="dv">${sbadge(e.status)}${e.everDisputed?' <span style="font-size:10px;background:#fef9c3;color:#92400e;border:1px solid #fbbf24;border-radius:3px;padding:1px 5px;font-weight:700;margin-left:4px">⚠️ Disputed</span>':''}</span></div><div class="dr"><span class="dl">Raised By</span><span class="dv">${av(e.raisedBy,20)}<span style="font-size:12px;margin-left:5px">${ru.nick||ru.name}</span></span></div><div class="dr"><span class="dl">Assigned To</span><span class="dv">${av(e.assignedTo,20)}<span style="font-size:12px;margin-left:5px">${au.nick||au.name}</span></span></div>${(e.passedThrough||[]).length?`<div class="dr"><span class="dl">Was With</span><span class="dv" style="font-size:12px">${e.passedThrough.map(uid=>dN(uid)).join(', ')}</span></div>`:''}</div>
+      <div><div class="dr"><span class="dl">Status</span><span class="dv">${sbadge(e.status)}${e.everDisputed?' <span style="font-size:10px;background:#fef9c3;color:#92400e;border:1px solid #fbbf24;border-radius:3px;padding:1px 5px;font-weight:700;margin-left:4px">⚠️ Disputed</span>':''}</span></div><div class="dr"><span class="dl">Raised By</span><span class="dv">${av(e.raisedBy,20)}<span style="font-size:12px;margin-left:5px">${ru.nick||ru.name}</span></span></div><div class="dr"><span class="dl">Assigned To</span><span class="dv">${av(e.assignedTo,20)}<span style="font-size:12px;margin-left:5px">${au.nick||au.name}</span></span></div>${(e.passedThrough||[]).length?`<div class="dr"><span class="dl">Was With</span><span class="dv" style="font-size:12px">${e.passedThrough.map(uid=>dN(uid)).join(', ')}</span></div>`:''}${e.faultedUser?`<div class="dr"><span class="dl">📌 Fault</span><span class="dv" style="font-size:12px;color:var(--red);font-weight:600">${dN(e.faultedUser)}</span></div>`:''}</div>
     </div>
     <div style="background:var(--g50);border-radius:8px;padding:13px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:5px">Description</div><div style="font-size:13px;color:var(--g700);line-height:1.7">${e.desc}</div></div>
     ${e.remarks?`<div style="background:var(--greenl);border-left:4px solid var(--green);border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:4px">✅ RESOLUTION</div><div style="font-size:13px;color:var(--g700)">${e.remarks}</div></div>`:''}
@@ -1240,8 +1275,14 @@ function updateStatus(id,ns,rmk){
 function resolveEsc(id,rmk){
   if(!rmk){showToast('Resolution remarks required','⚠️');return}
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
-  e.status='closed';e.remarks=rmk;e.updatedAt=new Date().toISOString();e.activity.push({user:CU.id,text:`Closed. Remarks: "${rmk}"`,time:new Date().toISOString()});
-  DB.saveE(es);addNotif(e.raisedBy,id,`${CU.nick||CU.name} closed ${id}: "${rmk}"`,'my');
+  const ft=_faultTag||'';_faultTag='';
+  e.status='closed';e.remarks=rmk;e.updatedAt=new Date().toISOString();
+  if(ft)e.faultedUser=ft;
+  const actText=`Closed. Remarks: "${rmk}"${ft?` 📌 Fault tagged: ${dN(ft)}`:''}`;
+  e.activity.push({user:CU.id,text:actText,time:new Date().toISOString()});
+  DB.saveE(es);
+  addNotif(e.raisedBy,id,`${CU.nick||CU.name} closed ${id}: "${rmk}"`,'my');
+  if(ft&&ft!==CU.id&&ft!==e.raisedBy)addNotif(ft,id,`📌 You were tagged as responsible in ${id} by ${CU.nick||CU.name}`,'in');
   closeM('m-detail');showToast(`${id} closed 🎉`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 function escalateEsc(id,rmk){
@@ -1336,6 +1377,10 @@ function renderReports(){
   <div class="card"><div class="ch"><span class="ct">👤 Agent Performance</span></div><div class="tw"><table>
     <thead><tr><th>Agent</th><th>Team</th><th>Assigned</th><th>Closed</th><th>Open</th><th>Avg TAT (h)</th></tr></thead>
     <tbody id="rpt-agents"></tbody>
+  </table></div></div>
+  <div class="card"><div class="ch"><span class="ct">📌 Fault Log (KRA)</span><span style="font-size:11px;color:var(--g400);margin-left:8px">Tickets tagged as responsible</span></div><div class="tw"><table>
+    <thead><tr><th>Person</th><th>Team</th><th>Role</th><th>Fault Count</th><th>Ticket IDs</th></tr></thead>
+    <tbody id="rpt-faults"></tbody>
   </table></div></div>`;
 }
 function applyRF(list){
@@ -1370,6 +1415,20 @@ function initCharts(){
     const avg=tats.length?(tats.reduce((a,b)=>a+b,0)/tats.length).toFixed(1):'—';
     return `<tr><td>${av(u.id,22)}<span style="margin-left:6px;font-weight:600">${u.nick||u.name}</span></td><td>${uTeams(u).join(', ')}</td><td>${asgn.length}</td><td>${cl.length}</td><td>${asgn.length-cl.length}</td><td>${avg}</td></tr>`;
   }).join('');
+  // Fault log table
+  const ftbody=document.getElementById('rpt-faults');if(!ftbody)return;
+  const faulted=es.filter(e=>e.faultedUser);
+  const fmap={};
+  faulted.forEach(e=>{const uid=e.faultedUser;if(!fmap[uid])fmap[uid]=[];fmap[uid].push(e.id);});
+  const fuids=Object.keys(fmap).sort((a,b)=>fmap[b].length-fmap[a].length);
+  if(!fuids.length){
+    ftbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--g400);padding:16px">No fault tags recorded</td></tr>`;
+  } else {
+    ftbody.innerHTML=fuids.map(uid=>{
+      const u=getU(uid);const ids=fmap[uid];
+      return `<tr><td>${av(uid,22)}<span style="margin-left:6px;font-weight:600">${u.nick||u.name}</span></td><td>${uTeams(u).join(', ')}</td><td>${RLBL[u.role]||u.role}</td><td><span style="font-weight:700;color:var(--red)">${ids.length}</span></td><td style="font-size:11px;color:var(--g500)">${ids.join(', ')}</td></tr>`;
+    }).join('');
+  }
 }
 
 // ── EXCEL EXPORT ──
@@ -1380,14 +1439,15 @@ function exportXLSX(){
     'Priority':e.priority,'Status':e.status,'Disputed':e.everDisputed?'Yes':'No','Raised By':getU(e.raisedBy).name,
     'Raised By Team':uTeams(getU(e.raisedBy)).join(', '),'Assigned To':getU(e.assignedTo).name,
     'Assigned Team':uTeams(getU(e.assignedTo)).join(', '),'Passed Through':(e.passedThrough||[]).map(id=>dN(id)).join(', '),
-    'Description':e.desc,'Resolution':e.remarks,'Created At':new Date(e.createdAt).toLocaleString('en-IN'),
+    'Description':e.desc,'Resolution':e.remarks,'Fault Tagged':e.faultedUser?dN(e.faultedUser):'',
+    'Created At':new Date(e.createdAt).toLocaleString('en-IN'),
     'Due Date':e.due?new Date(e.due).toLocaleString('en-IN'):'—',
     'Last Updated':new Date(e.updatedAt).toLocaleString('en-IN'),
     'Activity Log':e.activity.map(a=>`[${timeAgo(a.time)}] ${getU(a.user).name}: ${a.text}`).join(' | ')
   }));
   if(!rows.length){showToast('No data to export','⚠️');return}
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);
-  const colW=[{wch:18},{wch:28},{wch:22},{wch:26},{wch:10},{wch:12},{wch:16},{wch:12},{wch:16},{wch:12},{wch:20},{wch:40},{wch:30},{wch:18},{wch:18},{wch:18},{wch:20},{wch:80}];ws['!cols']=colW;
+  const colW=[{wch:18},{wch:28},{wch:22},{wch:26},{wch:10},{wch:12},{wch:16},{wch:12},{wch:16},{wch:12},{wch:20},{wch:40},{wch:30},{wch:18},{wch:20},{wch:18},{wch:18},{wch:18},{wch:20},{wch:80}];ws['!cols']=colW;
   XLSX.utils.book_append_sheet(wb,ws,'Escalations');XLSX.writeFile(wb,`escalations_${localDate()}.xlsx`);showToast('Excel downloaded ✓');
 }
 
@@ -1398,12 +1458,15 @@ function renderAdmin(){
   <div class="tabs">${[['users','👤 Users'],['companies','🏢 Companies'],['categories','🗂 Categories']].map(([t,l])=>`<button class="tab${adminTab===t?' active':''}" onclick="setAdminTab('${t}')">${l}</button>`).join('')}</div>
   ${adminTab==='users'?renderAdminUsers():adminTab==='companies'?renderAdminCos():renderAdminCats()}`;
 }
-function setAdminTab(t){adminTab=t;navigate('admin')}
+function setAdminTab(t){adminTab=t;adminQ='';navigate('admin')}
+function updateAdminQ(v){adminQ=v;document.getElementById('main').innerHTML=renderAdmin()}
 
 function renderAdminUsers(){
   const us=DB.users(),roleOpts=Object.entries(ROLES4).map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   const mgOpts=`<option value="">— None (top level) —</option>`+us.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
-  return `<div class="card"><div class="ch"><span class="ct">Team Members (${us.length})</span><div style="display:flex;gap:7px"><button class="btn btn-o btn-sm" onclick="dlUserTemplate()">⬇ CSV Template</button><label class="btn btn-o btn-sm" style="cursor:pointer">📥 Import CSV<input type="file" accept=".csv,.xlsx" style="display:none" onchange="importUsersCSV(this)"></label><button class="btn btn-p btn-sm" onclick="showUserForm()">+ Add</button></div></div>
+  const q=adminQ.toLowerCase();
+  const vis=q?us.filter(u=>[u.name,u.nick,u.mobile,RLBL[u.role]||'',uTeams(u).join(' ')].join(' ').toLowerCase().includes(q)):us;
+  return `<div class="card"><div class="ch"><span class="ct">Team Members (${vis.length}/${us.length})</span><div style="display:flex;gap:7px"><input class="ss-inp" style="width:180px" placeholder="🔍 Search users…" value="${adminQ}" oninput="updateAdminQ(this.value)"><button class="btn btn-o btn-sm" onclick="dlUserTemplate()">⬇ CSV Template</button><label class="btn btn-o btn-sm" style="cursor:pointer">📥 Import CSV<input type="file" accept=".csv,.xlsx" style="display:none" onchange="importUsersCSV(this)"></label><button class="btn btn-p btn-sm" onclick="showUserForm()">+ Add</button></div></div>
   <div id="uf-wrap" style="display:none"><div class="cb" style="border-bottom:1px solid var(--g100)"><div class="fgrid">
     <div class="fgroup"><label>Full Name *</label><input id="uf-name" class="inp" style="width:100%"></div>
     <div class="fgroup"><label>Nickname (shown in portal)</label><input id="uf-nick" class="inp" style="width:100%" placeholder="Short display name"></div>
@@ -1416,7 +1479,7 @@ function renderAdminUsers(){
     <input type="hidden" id="uf-id">
   </div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p btn-sm" onclick="saveUser()">Save</button><button class="btn btn-o btn-sm" onclick="document.getElementById('uf-wrap').style.display='none'">Cancel</button></div></div></div>
   <div class="tw"><table><thead><tr><th></th><th>Name</th><th>Code</th><th>Mobile</th><th>Role</th><th>Teams</th><th>Reports To</th><th>Password</th><th></th></tr></thead>
-  <tbody>${us.map(u=>`<tr><td>${av(u.id,26)}</td><td><strong>${u.name}</strong>${u.nick?`<div style="font-size:11px;color:var(--p)">${u.nick}</div>`:''}</td><td><span style="font-size:12px;font-weight:700;font-family:monospace;color:var(--p);background:var(--pl);padding:2px 7px;border-radius:4px">${u.userCode||'—'}</span></td><td>${u.mobile}</td><td>${RLBL[u.role]||u.role}</td><td>${uTeams(u).join(', ')}</td><td style="font-size:12px;color:var(--p)">${u.reportsTo?getU(u.reportsTo).name:'—'}</td><td style="font-size:12px;color:var(--g400);font-family:monospace">••••••</td><td style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="editUser('${u.id}')">Edit</button><button class="btn btn-r btn-sm" onclick="delUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  <tbody>${vis.map(u=>`<tr><td>${av(u.id,26)}</td><td><strong>${u.name}</strong>${u.nick?`<div style="font-size:11px;color:var(--p)">${u.nick}</div>`:''}</td><td><span style="font-size:12px;font-weight:700;font-family:monospace;color:var(--p);background:var(--pl);padding:2px 7px;border-radius:4px">${u.userCode||'—'}</span></td><td>${u.mobile}</td><td>${RLBL[u.role]||u.role}</td><td>${uTeams(u).join(', ')}</td><td style="font-size:12px;color:var(--p)">${u.reportsTo?getU(u.reportsTo).name:'—'}</td><td style="font-size:12px;color:var(--g400);font-family:monospace">••••••</td><td style="display:flex;gap:5px"><button class="btn btn-o btn-sm" onclick="editUser('${u.id}')">Edit</button><button class="btn btn-r btn-sm" onclick="delUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function showUserForm(u){
   document.getElementById('uf-wrap').style.display='block';
@@ -1561,9 +1624,10 @@ function showImportErrors(title,errors){
 }
 
 function renderAdminCos(){
-  return `<div class="card"><div class="ch"><span class="ct">Companies (${DB.cos().length})</span></div><div class="cb">
+  const all=DB.cos(),q=adminQ.toLowerCase(),vis=q?all.filter(c=>c.toLowerCase().includes(q)):all;
+  return `<div class="card"><div class="ch"><span class="ct">Companies (${vis.length}/${all.length})</span><input class="ss-inp" style="width:200px" placeholder="🔍 Search companies…" value="${adminQ}" oninput="updateAdminQ(this.value)"></div><div class="cb">
     <div style="display:flex;gap:8px;margin-bottom:14px"><input id="co-new" class="inp" style="flex:1" placeholder="Company name"><button class="btn btn-p btn-sm" onclick="addCo()">+ Add</button></div>
-    <div style="display:flex;flex-direction:column;gap:5px">${DB.cos().map((c,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--g50);border-radius:6px;border:1px solid var(--g200);font-size:13px">${c}<button onclick="delCo(${i})" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer">✕</button></div>`).join('')}
+    <div style="display:flex;flex-direction:column;gap:5px">${vis.map((c)=>{const i=all.indexOf(c);return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--g50);border-radius:6px;border:1px solid var(--g200);font-size:13px">${c}<button onclick="delCo(${i})" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer">✕</button></div>`}).join('')}
     </div></div></div>`;
 }
 function addCo(){const v=document.getElementById('co-new').value.trim();if(!v)return;const cs=DB.cos();if(cs.includes(v)){showToast('Exists','⚠️');return}cs.push(v);DB.saveC(cs);navigate('admin')}
@@ -1576,9 +1640,9 @@ function renderAdminCats(){
       <div style="padding:6px">${names.map(c=>`<div onclick="catTab='${c.replace(/'/g,"\\'")}';navigate('admin')" style="padding:8px 11px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;${catTab===c?'background:var(--pl);color:var(--p);font-weight:600':'color:var(--g700)'}">
         <span>${c}</span><button onclick="event.stopPropagation();delCat('${c.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer">✕</button>
       </div>`).join('')}</div></div>
-    <div class="card" style="flex:1"><div class="ch"><span class="ct">Sub-Categories — ${catTab||'Select category'}</span></div><div class="cb">
+    <div class="card" style="flex:1"><div class="ch"><span class="ct">Sub-Categories — ${catTab||'Select category'}</span>${catTab?`<input class="ss-inp" style="width:170px" placeholder="🔍 Search…" value="${adminQ}" oninput="updateAdminQ(this.value)">`:''}  </div><div class="cb">
       ${catTab?`<div style="display:flex;gap:8px;margin-bottom:12px"><input id="sub-new" class="inp" style="flex:1" placeholder="New sub-category"><button class="btn btn-p btn-sm" onclick="addSub()">+ Add</button></div>
-        <div style="display:flex;flex-direction:column;gap:5px">${(cats[catTab]||[]).map((s,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--g50);border-radius:6px;border:1px solid var(--g200);font-size:13px">${s}<button onclick="delSub(${i})" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer">✕</button></div>`).join('')}</div>`
+        <div style="display:flex;flex-direction:column;gap:5px">${(cats[catTab]||[]).filter((s,i)=>!adminQ||s.toLowerCase().includes(adminQ.toLowerCase())).map((s)=>{const i=(cats[catTab]||[]).indexOf(s);return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--g50);border-radius:6px;border:1px solid var(--g200);font-size:13px">${s}<button onclick="delSub(${i})" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer">✕</button></div>`}).join('')}</div>`
       :'<div style="color:var(--g400);font-size:13px">Select a category.</div>'}
     </div></div>
   </div>`;
