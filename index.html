@@ -638,14 +638,22 @@ function doRmk(){
   _faultTag=document.getElementById('fault-tag-sel')?.value||'';
   const fn=_pa?.fn;_pa=null;if(fn)fn(r);
 }
+let _ftPool=[];
 function toggleFaultTag(checked){
   const pick=document.getElementById('rmk-fault-pick');if(!pick)return;
-  if(!checked){pick.style.display='none';return}
-  const pool=DB.users().filter(u=>u.id!==CU.id&&uTeams(u).some(t=>uTeams(CU).includes(t)));
-  const sel=document.getElementById('fault-tag-sel');
-  if(sel)sel.innerHTML=`<option value="">— Select person —</option>`+pool.map(u=>`<option value="${u.id}">${u.nick||u.name} (${RLBL[u.role]||u.role})</option>`).join('');
+  if(!checked){pick.style.display='none';_ftPool=[];const q=document.getElementById('fault-tag-q');if(q)q.value='';return}
+  _ftPool=DB.users().filter(u=>u.id!==CU.id&&uTeams(u).some(t=>uTeams(CU).includes(t)));
+  renderFaultTagOpts('');
   pick.style.display='block';
+  const q=document.getElementById('fault-tag-q');if(q){q.value='';q.focus();}
 }
+function renderFaultTagOpts(q){
+  const sel=document.getElementById('fault-tag-sel');if(!sel)return;
+  const lq=q.toLowerCase();
+  const vis=lq?_ftPool.filter(u=>`${u.nick||u.name} ${RLBL[u.role]||u.role} ${uTeams(u).join(' ')}`.toLowerCase().includes(lq)):_ftPool;
+  sel.innerHTML=`<option value="">— Select person —</option>`+vis.map(u=>`<option value="${u.id}">${u.nick||u.name} (${RLBL[u.role]||u.role})</option>`).join('');
+}
+function filterFaultTag(v){renderFaultTagOpts(v)}
 
 // ── AUTH ──
 async function doLogin(){
@@ -1212,7 +1220,10 @@ function openDetail(id){
   const rmkBox=`<div id="rmk-box" class="rmk-box" style="display:none"><label id="rmk-lbl"></label><textarea id="rmk-txt" class="rmk-ta" placeholder="Add remarks…"></textarea>
     <div id="rmk-fault-wrap" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--g200)">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--g600)"><input type="checkbox" id="rmk-fault-chk" onchange="toggleFaultTag(this.checked)"> 📌 Tag responsible person</label>
-      <div id="rmk-fault-pick" style="display:none;margin-top:8px"><select id="fault-tag-sel" class="inp" style="width:100%"><option value="">— Select person —</option></select></div>
+      <div id="rmk-fault-pick" style="display:none;margin-top:8px">
+        <input id="fault-tag-q" class="ss-inp" style="width:100%;margin-bottom:6px" placeholder="🔍 Search person…" oninput="filterFaultTag(this.value)">
+        <select id="fault-tag-sel" class="inp" style="width:100%"><option value="">— Select person —</option></select>
+      </div>
     </div>
     <div style="margin-top:8px;display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="doRmk()">✓ Confirm</button><button class="btn btn-o btn-sm" onclick="cancelRmk()">Cancel</button></div></div>`;
 
