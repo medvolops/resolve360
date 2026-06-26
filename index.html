@@ -559,6 +559,7 @@ function fBar(){
     ${mkMSS('team',['',...teams],['All Teams',...teams])}
     ${mkMSS('rby',['',...users.map(u=>u.id)],['Raised By',...users.map(u=>u.nick||u.name)])}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)])}
+    ${mkMSS('fu',['','yes'],['🚩 Flagged','🚩 Follow-up Only'])}
     <span style="font-size:11px;font-weight:600;color:var(--g500);white-space:nowrap">📅 From</span>
     <input type="date" class="ss-inp" style="width:130px" value="${F.from||''}" onchange="F.from=this.value;PAGE={};refreshView()">
     <span style="font-size:11px;color:var(--g400)">→</span>
@@ -575,6 +576,7 @@ function applyF(list){return list.filter(e=>{
   if(F.team?.length&&!F.team.some(t=>uTeams(getU(e.raisedBy)).includes(t)||uTeams(getU(e.assignedTo)).includes(t)))return false;
   if(F.rby?.length&&!F.rby.includes(e.raisedBy))return false;
   if(F.uid?.length&&!F.uid.includes(e.assignedTo))return false;
+  if(F.fu?.includes('yes')&&!e.followUp)return false;
   if(F.from&&new Date(e.createdAt)<new Date(F.from))return false;
   if(F.to&&new Date(e.createdAt)>new Date(F.to+'T23:59:59'))return false;
   return true})}
@@ -589,6 +591,7 @@ function dashFBar(){
     ${mkMSS('cat',['',...cats],['Category',...cats],'DF')}
     ${mkMSS('co',['',...cos],['Company',...cos],'DF')}
     ${mkMSS('uid',['',...users.map(u=>u.id)],['Assigned To',...users.map(u=>u.nick||u.name)],'DF')}
+    ${mkMSS('fu',['','yes'],['🚩 Flagged','🚩 Follow-up Only'],'DF')}
     <span style="font-size:11px;font-weight:600;color:var(--g500);white-space:nowrap">📅 From</span>
     <input type="date" class="ss-inp" style="width:130px" value="${DF.from||''}" onchange="DF.from=this.value;refreshView()">
     <span style="font-size:11px;color:var(--g400)">→</span>
@@ -604,6 +607,7 @@ function applyDF(list){return list.filter(e=>{
   if(DF.cat?.length&&!DF.cat.includes(e.category))return false;
   if(DF.co?.length&&!DF.co.includes(e.company))return false;
   if(DF.uid?.length&&!DF.uid.includes(e.assignedTo))return false;
+  if(DF.fu?.includes('yes')&&!e.followUp)return false;
   if(DF.from&&new Date(e.createdAt)<new Date(DF.from))return false;
   if(DF.to&&new Date(e.createdAt)>new Date(DF.to+'T23:59:59'))return false;
   return true})}
@@ -1107,7 +1111,7 @@ function submitEsc(){
 function openDetail(id){
   _pa=null; // clear any stale remark callback from previous modal
   const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
-  const isR=CU.id===e.raisedBy,isA=CU.id===e.assignedTo;
+  const isR=CU.id===e.raisedBy,isA=CU.id===e.assignedTo,isAM=CU.role==='account_manager';
   const ru=getU(e.raisedBy),au=getU(e.assignedTo);
   const steps=['pending','processing','onhold','closed'],lbls=['⏳ Pending','🔄 Processing','⏸ On Hold','✅ Closed'],si=steps.indexOf(e.status);
   const stepper=`<div class="stepper">${steps.map((s,i)=>`<div class="stp ${i<si?'done':i===si?'act2':''}">${lbls[i]}</div>`).join('')}</div>`;
@@ -1157,6 +1161,24 @@ function openDetail(id){
     </div>`;
   }
 
+  // AM-specific: route/change-assign panel (shown for isR or isA when role=account_manager)
+  let amHtml='';
+  if(isAM&&e.status!=='closed'&&(isA||isR)){
+    const agentPool=DB.users().filter(u=>['agent','senior_agent'].includes(u.role)&&u.id!==e.assignedTo);
+    M.amroute='';
+    const amLbl=isA?'🔄 Route to Agent':'🔄 Change Assignment';
+    const amFn=isA?`doAMRoute('${id}',r)`:`doAMChangeAssign('${id}',r)`;
+    const amBtnLbl=isA?'Route':'Assign';
+    const amNote=isA?'<span style="font-size:11px;color:var(--g400);font-weight:400;text-transform:none"> (you\'ll be marked passed through)</span>':'';
+    amHtml=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)">
+      <div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">${amLbl}${amNote}</div>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1">${mkMS('amroute',['',...agentPool.map(u=>u.id)],['— Select agent —',...agentPool.map(u=>`${u.nick||u.name} — ${uTeams(u).join(', ')}`)])}</div>
+        <button class="btn btn-p btn-sm" onclick="showRmk('${isA?'Route to Agent':'Change Assignment'}',r=>${amFn})">${amBtnLbl}</button>
+      </div>
+    </div>`;
+  }
+
   const rmkBox=`<div id="rmk-box" class="rmk-box" style="display:none"><label id="rmk-lbl"></label><textarea id="rmk-txt" class="rmk-ta" placeholder="Add remarks…"></textarea><div style="margin-top:8px;display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="doRmk()">✓ Confirm</button><button class="btn btn-o btn-sm" onclick="cancelRmk()">Cancel</button></div></div>`;
 
   document.getElementById('d-title').innerHTML=`<span class="idc" style="cursor:default">${e.id}</span> &nbsp;${e.subcategory||e.category}`;
@@ -1174,7 +1196,7 @@ function openDetail(id){
     ${e.remarks?`<div style="background:var(--greenl);border-left:4px solid var(--green);border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:4px">✅ RESOLUTION</div><div style="font-size:13px;color:var(--g700)">${e.remarks}</div></div>`:''}
     ${editHtml}
     <div style="margin-top:16px"><div style="font-size:10px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">Activity Log</div><div class="act">${activity}</div></div>
-    ${actionHtml}${reassignHtml}${rmkBox}
+    ${actionHtml}${reassignHtml}${amHtml}${rmkBox}
     ${e.status!=='closed'?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--g100)"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;margin-bottom:8px">💬 Add Comment</div><div style="display:flex;gap:8px"><textarea id="cmt-txt" class="rmk-ta" style="flex:1;min-height:60px" placeholder="Visible to all — type your comment…"></textarea><button class="btn btn-p btn-sm" style="align-self:flex-end" onclick="submitComment('${id}')">Post</button></div></div>`:''}
     `;
   const canFlag=(isR||isTeam())&&['pending','processing','onhold','disputed'].includes(e.status);
@@ -1250,6 +1272,33 @@ function doReassign(id,rmk){
   e.activity.push({user:CU.id,text:`Reassigned ${oldNm} → ${dN(sel)}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
   DB.saveE(es);addNotif(sel,id,`${CU.nick||CU.name} reassigned ${id} to you${rmk?': "'+rmk+'"':''}`,'in');if(e.raisedBy!==CU.id)addNotif(e.raisedBy,id,`${id} reassigned to ${dN(sel)}`,'my');
   closeM('m-detail');showToast(`Reassigned to ${dN(sel)}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
+}
+
+// AM is the assignee — routes ticket to an agent; AM is added to passedThrough
+function doAMRoute(id,rmk){
+  const sel=M.amroute;if(!sel){showToast('Select an agent','⚠️');return}
+  const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
+  const resolved=resolveLeaveAssign(sel);
+  const pt=e.passedThrough||[];if(!pt.includes(e.assignedTo))pt.push(e.assignedTo);
+  e.assignedTo=resolved;e.passedThrough=pt;e.status='pending';e.updatedAt=new Date().toISOString();
+  e.activity.push({user:CU.id,text:`Routed to ${dN(resolved)}. Status → Pending.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
+  DB.saveE(es);
+  addNotif(resolved,id,`${CU.nick||CU.name} routed ${id} to you${rmk?': "'+rmk+'"':''}`, 'in');
+  if(e.raisedBy!==CU.id)addNotif(e.raisedBy,id,`${id} routed to ${dN(resolved)}`,'my');
+  closeM('m-detail');showToast(`Routed to ${dN(resolved)}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
+}
+// AM is the raiser — changes which agent the ticket is assigned to
+function doAMChangeAssign(id,rmk){
+  const sel=M.amroute;if(!sel){showToast('Select an agent','⚠️');return}
+  const es=DB.escs(),e=es.find(x=>x.id===id);if(!e)return;
+  const resolved=resolveLeaveAssign(sel);
+  const oldNm=dN(e.assignedTo);
+  const pt=e.passedThrough||[];if(e.assignedTo&&!pt.includes(e.assignedTo))pt.push(e.assignedTo);
+  e.assignedTo=resolved;e.passedThrough=pt;e.status='pending';e.updatedAt=new Date().toISOString();
+  e.activity.push({user:CU.id,text:`Reassigned ${oldNm} → ${dN(resolved)}.${rmk?' Remarks: "'+rmk+'"':''}`,time:new Date().toISOString()});
+  DB.saveE(es);
+  addNotif(resolved,id,`${CU.nick||CU.name} assigned ${id} to you${rmk?': "'+rmk+'"':''}`, 'in');
+  closeM('m-detail');showToast(`Assigned to ${dN(resolved)}`);bcast('r');bcast('n');navigate(CP);buildSidebar();
 }
 
 // ── REPORTS ──
