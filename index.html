@@ -376,9 +376,9 @@ applyTheme(CUR_THEME,false);
 
 // ── ROLE SYSTEM ──
 const RA={agent:1,senior_agent:1,account_manager:1,tl:2,manager:3,admin:3,senior_mgmt:4};
-const RLBL={agent:'Agent',senior_agent:'Agent',account_manager:'Team Lead',tl:'Team Lead',manager:'Manager',admin:'Manager',senior_mgmt:'Senior Management'};
+const RLBL={agent:'Agent',senior_agent:'Senior Agent',account_manager:'Account Manager',tl:'Team Lead',manager:'Manager',admin:'Manager',senior_mgmt:'Senior Management'};
 // 4 clean roles for new users
-const ROLES4={agent:'Agent',tl:'Team Lead',manager:'Manager',senior_mgmt:'Senior Management'};
+const ROLES4={agent:'Agent',senior_agent:'Senior Agent',account_manager:'Account Manager',tl:'Team Lead',manager:'Manager',senior_mgmt:'Senior Management'};
 const myAcc=()=>RA[CU?.role]||1;
 const isTeam=()=>myAcc()>=2;
 const isFull=()=>myAcc()>=3;
